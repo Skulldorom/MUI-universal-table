@@ -139,7 +139,6 @@ export default function UniversalTable({
       />
       <Paper
         sx={{
-          ...(!subTable && { mb: 2 }),
           ...(subTable && { boxShadow: "none" }),
         }}
       >
@@ -171,7 +170,7 @@ export default function UniversalTable({
         <Typography
           variant={subTable ? "h6" : "h5"}
           color={subTable ? "secondary" : "primary"}
-          sx={{ m: 1, pt: 2 }}
+          sx={{ p: 2 }}
         >
           {name}
         </Typography>
