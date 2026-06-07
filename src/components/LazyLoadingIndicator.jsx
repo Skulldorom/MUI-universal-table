@@ -9,7 +9,10 @@ const LazyLoadingIndicator = ({ show, currentPage, totalPages }) => {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           Loading page {currentPage} of {totalPages}...
         </Typography>
-        <LinearProgress />
+        <LinearProgress
+          variant="determinate"
+          value={(currentPage / totalPages) * 100}
+        />
       </Box>
     </Collapse>
   );
