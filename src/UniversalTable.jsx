@@ -21,11 +21,10 @@ import {
   Checkbox,
 } from "@mui/material";
 import { Box } from "@mui/material";
-import TableLoader from "./components/TableLoader";
+import { alpha } from "@mui/material/styles";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { AddCircle, RemoveCircle, Task } from "@mui/icons-material";
-
-import { alpha } from "@mui/material/styles";
+import TableLoader from "./components/TableLoader";
 import LazyLoadingIndicator from "./components/LazyLoadingIndicator";
 import FancySearch from "./components/FancySearch";
 
@@ -46,6 +45,172 @@ const visuallyHidden = {
   width: "1px",
 };
 
+function getSelectableRowId(row, index, selectID) {
+  return selectID ? row[selectID] : index;
+}
+
+function getSearchableColumnIds(headers) {
+  return headers
+    .filter((column) => column.searchable)
+    .map((column) => column.id);
+}
+
+function filterRows(data, searchTerm, filterOptions) {
+  if (!searchTerm) {
+    return data;
+  }
+
+  const term = searchTerm.toLocaleLowerCase();
+  return data.filter((row) =>
+    filterOptions.some((filterOption) =>
+      String(row[filterOption]).toLocaleLowerCase().includes(term),
+    ),
+  );
+}
+
+function useSearchableRows(data, headers) {
+  const [searchDets, setSearchDets] = React.useState("");
+
+  const filterOptions = React.useMemo(
+    () => getSearchableColumnIds(headers),
+    [headers],
+  );
+
+  const rows = React.useMemo(
+    () => filterRows(data, searchDets, filterOptions),
+    [data, filterOptions, searchDets],
+  );
+
+  return {
+    rows,
+    searchDets,
+    setSearchDets,
+  };
+}
+
+function useSelectableRows({ rows, selectRows, selectID }) {
+  const [selected, setSelected] = React.useState([]);
+
+  const clearSelection = React.useCallback(() => {
+    setSelected([]);
+  }, []);
+
+  const handleSelectAllClick = React.useCallback(
+    (event) => {
+      if (!event.target.checked) {
+        setSelected([]);
+        return;
+      }
+
+      const newSelected = rows.map((row, index) =>
+        getSelectableRowId(row, index, selectID),
+      );
+      setSelected(newSelected);
+    },
+    [rows, selectID],
+  );
+
+  const handleClick = React.useCallback(
+    (event, id) => {
+      if (!selectRows) {
+        return;
+      }
+
+      setSelected((previous) =>
+        previous.includes(id)
+          ? previous.filter((selectedId) => selectedId !== id)
+          : [...previous, id],
+      );
+    },
+    [selectRows],
+  );
+
+  return {
+    selected,
+    clearSelection,
+    handleSelectAllClick,
+    handleClick,
+  };
+}
+
+function TableSelectionBanner({ selected, onSelection, selectIcon }) {
+  return (
+    <Collapse in={selected.length > 0} unmountOnExit>
+      <Box
+        sx={{
+          p: 2,
+          display: "flex",
+          justifyContent: "space-between",
+          bgcolor: (theme) =>
+            alpha(
+              theme.palette.primary.main,
+              theme.palette.action.activatedOpacity,
+            ),
+          borderRadius: 1,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+        }}
+      >
+        <Typography variant="h6" id="tableTitle" component="div">
+          {selected.length} selected
+        </Typography>
+
+        <IconButton onClick={() => onSelection(selected)}>
+          {selectIcon || <Task />}
+        </IconButton>
+      </Box>
+    </Collapse>
+  );
+}
+
+function TableTitle({ name, subTable }) {
+  return (
+    <Typography
+      variant={subTable ? "h6" : "h5"}
+      color={subTable ? "secondary" : "primary"}
+      sx={{ p: 2 }}
+    >
+      {name}
+    </Typography>
+  );
+}
+
+function TableToolbarContent({
+  setLoading,
+  reloadBtnLoading,
+  searchDets,
+  onSearchChange,
+  name,
+}) {
+  return (
+    <Toolbar
+      sx={{
+        pl: { sm: 2 },
+        pr: { xs: 1, sm: 1 },
+        pt: 2,
+      }}
+    >
+      <Stack
+        spacing={2}
+        direction={{ xs: "column", md: "row" }}
+        sx={{
+          width: "100%",
+          alignItems: { xs: "flex-start", md: "center" },
+        }}
+      >
+        <Box sx={{ flex: "1 1 100%" }} id="tableTitle">
+          <ReloadBtn setLoading={setLoading} loading={reloadBtnLoading} />
+        </Box>
+        <SearchArea
+          current={searchDets}
+          setFinalVal={onSearchChange}
+          searchName={name}
+        />
+      </Stack>
+    </Toolbar>
+  );
+}
+
 export default function UniversalTable({
   loading,
   setLoading,
@@ -64,73 +229,20 @@ export default function UniversalTable({
   onSelection,
 }) {
   const head = headers || [];
+  const { rows, searchDets, setSearchDets } = useSearchableRows(data, head);
+  const { selected, clearSelection, handleSelectAllClick, handleClick } =
+    useSelectableRows({
+      rows,
+      selectRows,
+      selectID,
+    });
 
-  const [rows, setRows] = React.useState(data);
-  const [searchDets, setSearchDets] = React.useState("");
-  const [autoFocus, setAutoFocus] = React.useState(false);
-  const [selected, setSelected] = React.useState([]);
-
-  const filterOptions = React.useMemo(() => {
-    return headers
-      .filter((column) => column.searchable)
-      .map((column) => column.id);
-  }, [headers]);
-
-  const filteredRows = React.useMemo(() => {
-    if (searchDets) {
-      const term = searchDets.toLocaleLowerCase();
-      return data.filter((val) => {
-        let found = false;
-        for (const filterOption of filterOptions) {
-          found =
-            found ||
-            String(val[filterOption]).toLocaleLowerCase().includes(term);
-        }
-        return found;
-      });
-    }
-    return data;
-  }, [searchDets, data, filterOptions]);
-
-  React.useEffect(() => {
-    setRows(filteredRows);
-  }, [filteredRows]);
-
-  React.useEffect(() => {
-    setSelected([]);
-  }, [searchDets]);
-
-  const handleSearchChange = React.useCallback((value) => {
-    setSearchDets(value);
-  }, []);
-
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelected = rows.map((row, index) =>
-        selectID ? row[selectID] : index,
-      );
-      setSelected(newSelected);
-      return;
-    }
-    setSelected([]);
-  };
-
-  const handleClick = React.useCallback(
-    (event, id) => {
-      if (!selectRows) return;
-      const selectedIndex = selected.indexOf(id);
-      let newSelected = [];
-
-      if (selectedIndex === -1) {
-        // Item not selected, add it
-        newSelected = [...selected, id];
-      } else {
-        // Item is selected, remove it
-        newSelected = selected.filter((selectedId) => selectedId !== id);
-      }
-      setSelected(newSelected);
+  const handleSearchChange = React.useCallback(
+    (value) => {
+      clearSelection();
+      setSearchDets(value);
     },
-    [selected, selectRows],
+    [clearSelection, setSearchDets],
   );
 
   return (
@@ -145,75 +257,24 @@ export default function UniversalTable({
           ...(subTable && { boxShadow: "none" }),
         }}
       >
-        <Collapse in={selected.length > 0} unmountOnExit>
-          <Box
-            sx={{
-              p: 2,
-              display: "flex",
-              justifyContent: "space-between",
-              bgcolor: (theme) =>
-                alpha(
-                  theme.palette.primary.main,
-                  theme.palette.action.activatedOpacity,
-                ),
-              borderRadius: 1,
-              borderBottomLeftRadius: 0,
-              borderBottomRightRadius: 0,
-            }}
-          >
-            <Typography variant="h6" id="tableTitle" component="div">
-              {selected.length} selected
-            </Typography>
-
-            <IconButton onClick={() => onSelection(selected)}>
-              {selectIcon || <Task />}
-            </IconButton>
-          </Box>
-        </Collapse>
-        <Typography
-          variant={subTable ? "h6" : "h5"}
-          color={subTable ? "secondary" : "primary"}
-          sx={{ p: 2 }}
-        >
-          {name}
-        </Typography>
+        <TableSelectionBanner
+          selected={selected}
+          onSelection={onSelection}
+          selectIcon={selectIcon}
+        />
+        <TableTitle name={name} subTable={subTable} />
         {!subTable && (
-          <Toolbar
-            sx={{
-              pl: { sm: 2 },
-              pr: { xs: 1, sm: 1 },
-              pt: 2,
-            }}
-          >
-            <Stack
-              spacing={2}
-              direction={{ xs: "column", md: "row" }}
-              sx={{
-                width: "100%",
-                alignItems: { xs: "flex-start", md: "center" },
-              }}
-            >
-              <Box sx={{ flex: "1 1 100%" }} id="tableTitle">
-                <ReloadBtn setLoading={setLoading} loading={reloadBtnLoading} />
-              </Box>
-              <SearchArea
-                current={searchDets}
-                setFinalVal={handleSearchChange}
-                autoFocus={autoFocus}
-                setAutoFocus={setAutoFocus}
-                searchName={name}
-              />
-            </Stack>
-          </Toolbar>
+          <TableToolbarContent
+            setLoading={setLoading}
+            reloadBtnLoading={reloadBtnLoading}
+            searchDets={searchDets}
+            onSearchChange={handleSearchChange}
+            name={name}
+          />
         )}
         <EnhancedTable
           headers={head}
-          name={
-            !subTable && (
-              <ReloadBtn setLoading={setLoading} loading={reloadBtnLoading} />
-            )
-          }
-          rows={rows || []}
+          rows={rows}
           resetFlag={searchDets}
           subTable={subTable}
           hideBadge={hideBadge}
@@ -239,10 +300,10 @@ function EnhancedTableHead(props) {
     rowCount,
     onSelectAllClick,
   } = props;
+
   const createSortHandler = (property) => (event) => {
     onRequestSort(event, property);
   };
-  const headCells = props.headings;
 
   return (
     <TableHead>
@@ -257,7 +318,7 @@ function EnhancedTableHead(props) {
             />
           </TableCell>
         )}
-        {headCells.map((headCell) => (
+        {props.headings.map((headCell) => (
           <TableCell
             key={headCell.id}
             align={headCell.numeric ? "right" : "left"}
@@ -283,63 +344,89 @@ function EnhancedTableHead(props) {
   );
 }
 
-EnhancedTableHead.propTypes = {
-  onRequestSort: PropTypes.func.isRequired,
-  order: PropTypes.oneOf(["asc", "desc"]).isRequired,
-  orderBy: PropTypes.string.isRequired,
-  headings: PropTypes.array.isRequired,
-  selectRows: PropTypes.bool,
-  numSelected: PropTypes.number,
-  rowCount: PropTypes.number,
-  onSelectAllClick: PropTypes.func,
-};
+function getPageOptions(rowCount) {
+  if (rowCount <= 5) return [5];
+  if (rowCount <= 10) return [5, rowCount];
+  if (rowCount <= 25) return [5, 10, rowCount];
+  if (rowCount < 50) return [5, 10, 25, rowCount];
+  if (rowCount < 100) return [5, 10, 25, 50, rowCount];
+  return [5, 10, 25, 50, 100, rowCount];
+}
 
-function EnhancedTable(props) {
+function useEnhancedTableState({ rows, subTable, resetFlag }) {
   const [order, setOrder] = React.useState("desc");
   const [orderBy, setOrderBy] = React.useState("");
-  const [page, setPage] = React.useState(0);
-  const subTable = props.subTable;
-  const rows = props.rows;
-  const [rowsPerPage, setRowsPerPage] = React.useState(
-    subTable ? rows.length : 5,
+  const [pagination, setPagination] = React.useState(() => ({
+    page: 0,
+    rowsPerPage: subTable ? rows.length : 5,
+    resetFlag,
+  }));
+
+  const page = pagination.resetFlag === resetFlag ? pagination.page : 0;
+  const rowsPerPage = subTable ? rows.length : pagination.rowsPerPage;
+
+  const handleRequestSort = React.useCallback(
+    (event, property) => {
+      const isAsc = orderBy === property && order === "asc";
+      setOrder(isAsc ? "desc" : "asc");
+      setOrderBy(property);
+    },
+    [order, orderBy],
   );
-  const selected = props.selected;
-  const selectID = props.selectID;
 
+  const handleChangePage = React.useCallback(
+    (event, newPage) => {
+      setPagination((previous) => ({
+        ...previous,
+        page: newPage,
+        resetFlag,
+      }));
+    },
+    [resetFlag],
+  );
+
+  const handleChangeRowsPerPage = React.useCallback(
+    (event) => {
+      setPagination((previous) => ({
+        ...previous,
+        page: 0,
+        rowsPerPage: Number.parseInt(event.target.value, 10),
+        resetFlag,
+      }));
+    },
+    [resetFlag],
+  );
+
+  return {
+    order,
+    orderBy,
+    page,
+    rowsPerPage,
+    handleRequestSort,
+    handleChangePage,
+    handleChangeRowsPerPage,
+  };
+}
+
+function EnhancedTable(props) {
+  const { headers, rows, subTable, selected, selectID } = props;
   const dense = true;
-
-  const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === "asc";
-    setOrder(isAsc ? "desc" : "asc");
-    setOrderBy(property);
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(Number.parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  const {
+    order,
+    orderBy,
+    page,
+    rowsPerPage,
+    handleRequestSort,
+    handleChangePage,
+    handleChangeRowsPerPage,
+  } = useEnhancedTableState({
+    rows,
+    subTable,
+    resetFlag: props.resetFlag,
+  });
 
   const emptyRows =
     rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage);
-
-  const resetFlag = props.resetFlag;
-
-  React.useEffect(() => {
-    setPage(0);
-  }, [resetFlag]);
-
-  const pageOptions = () => {
-    if (rows.length <= 5) return [5];
-    if (rows.length <= 10) return [5, rows.length];
-    if (rows.length <= 25) return [5, 10, rows.length];
-    if (rows.length < 50) return [5, 10, 25, rows.length];
-    if (rows.length < 100) return [5, 10, 25, 50, rows.length];
-    return [5, 10, 25, 50, 100, rows.length];
-  };
 
   const isSelected = React.useCallback(
     (id) => selected.includes(id),
@@ -348,107 +435,195 @@ function EnhancedTable(props) {
 
   const visibleRows = React.useMemo(
     () =>
-      stableSort(rows, getComparator(order, orderBy), props.headers).slice(
+      stableSort(rows, getComparator(order, orderBy), headers).slice(
         page * rowsPerPage,
         page * rowsPerPage + rowsPerPage,
       ),
-    [rows, order, orderBy, props.headers, page, rowsPerPage],
+    [headers, order, orderBy, page, rows, rowsPerPage],
   );
 
   return (
-    <>
-      <TableContainer>
-        <Table sx={{ minWidth: 750 }} size={dense ? "small" : "medium"}>
-          {props.loading ? (
-            <TableLoader />
-          ) : (
-            <>
-              <EnhancedTableHead
-                order={order}
-                orderBy={orderBy}
-                onRequestSort={handleRequestSort}
-                headings={props.headers}
-                selectRows={props.selectRows}
-                numSelected={selected.length}
-                rowCount={rows.length}
-                onSelectAllClick={props.handleSelectAllClick}
-              />
-
-              <TableBody>
-                {visibleRows.map((row, index) => {
-                  const rowKey = selectID
-                    ? row[selectID]
-                    : `row-${page * rowsPerPage + index}`;
-                  return (
-                    <DataRow
-                      key={rowKey}
-                      rowID={selectID ? row[selectID] : index}
-                      headers={props.headers}
-                      rowValues={row}
-                      hideBadge={props.hideBadge}
-                      selectRows={props.selectRows}
-                      handleClick={props.handleClick}
-                      isSelected={isSelected}
-                    />
-                  );
-                })}
-                {!subTable && emptyRows > 0 && (
-                  <TableRow style={{ height: (dense ? 33 : 53) * emptyRows }}>
-                    <TableCell colSpan={props.headers.length} />
-                  </TableRow>
-                )}
-              </TableBody>
-            </>
-          )}
-        </Table>
-        {subTable ? (
-          <Box sx={{ mb: 3 }} />
+    <TableContainer>
+      <Table sx={{ minWidth: 750 }} size={dense ? "small" : "medium"}>
+        {props.loading ? (
+          <TableLoader />
         ) : (
-          <TablePagination
-            rowsPerPageOptions={pageOptions()}
-            component="div"
-            count={rows.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            sx={{ overflow: "visible" }}
-            showFirstButton
-            showLastButton
-          />
+          <>
+            <EnhancedTableHead
+              order={order}
+              orderBy={orderBy}
+              onRequestSort={handleRequestSort}
+              headings={headers}
+              selectRows={props.selectRows}
+              numSelected={selected.length}
+              rowCount={rows.length}
+              onSelectAllClick={props.handleSelectAllClick}
+            />
+
+            <TableBody>
+              {visibleRows.map((row, index) => {
+                const rowIndex = page * rowsPerPage + index;
+                const rowID = getSelectableRowId(row, rowIndex, selectID);
+
+                return (
+                  <DataRow
+                    key={rowID}
+                    rowID={rowID}
+                    headers={headers}
+                    rowValues={row}
+                    hideBadge={props.hideBadge}
+                    selectRows={props.selectRows}
+                    handleClick={props.handleClick}
+                    isSelected={isSelected}
+                  />
+                );
+              })}
+              {!subTable && emptyRows > 0 && (
+                <TableRow style={{ height: (dense ? 33 : 53) * emptyRows }}>
+                  <TableCell colSpan={headers.length} />
+                </TableRow>
+              )}
+            </TableBody>
+          </>
         )}
-      </TableContainer>
-    </>
+      </Table>
+      {subTable ? (
+        <Box sx={{ mb: 3 }} />
+      ) : (
+        <TablePagination
+          rowsPerPageOptions={getPageOptions(rows.length)}
+          component="div"
+          count={rows.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{ overflow: "visible" }}
+          showFirstButton
+          showLastButton
+        />
+      )}
+    </TableContainer>
+  );
+}
+
+function splitHeaders(headers) {
+  return headers.reduce(
+    (groups, header) => {
+      if (header.subRow) {
+        groups.subTables.push(header);
+      } else {
+        groups.columns.push(header);
+      }
+
+      return groups;
+    },
+    { subTables: [], columns: [] },
+  );
+}
+
+function formatCellValue(header, rowValues) {
+  if (!header.date) {
+    return rowValues[header.id];
+  }
+
+  return (
+    new Date(rowValues[header.id]).toDateString() +
+    " " +
+    new Date(rowValues[header.id]).toLocaleTimeString()
+  );
+}
+
+function renderDataCells(headers, rowValues) {
+  return headers.map((header, index) => (
+    <TableCell key={`${header.id}-${index}`} {...header.cellProps}>
+      {header.component
+        ? header.component(rowValues)
+        : formatCellValue(header, rowValues)}
+    </TableCell>
+  ));
+}
+
+function SubRowToggleCell({
+  header,
+  isOpen,
+  onToggle,
+  rowValues,
+  hideBadge,
+}) {
+  return (
+    <TableCell>
+      <Tooltip title={isOpen ? `Hide ${header.id}` : `Show ${header.id}`}>
+        <Box>
+          <IconButton
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle();
+            }}
+            disabled={rowValues[header.id].length === 0}
+            color={header.iconColor || "secondary"}
+          >
+            <Badge
+              badgeContent={rowValues[header.id].length}
+              invisible={hideBadge}
+              anchorOrigin={{
+                vertical: "bottom",
+                horizontal: "right",
+              }}
+              sx={{
+                "& .MuiBadge-badge": {
+                  color: (theme) => theme.palette.text.primary,
+                },
+              }}
+            >
+              {isOpen
+                ? header?.closeIcon || <RemoveCircle />
+                : header?.openIcon || <AddCircle />}
+            </Badge>
+          </IconButton>
+        </Box>
+      </Tooltip>
+    </TableCell>
+  );
+}
+
+function SubTableRow({ table, isOpen, rowValues, colSpan }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={colSpan} style={{ paddingBottom: 0, paddingTop: 0 }}>
+        <Collapse in={isOpen} timeout="auto" unmountOnExit>
+          <UniversalTable
+            loading={table.loading}
+            setLoading={table.setLoading}
+            data={rowValues[table.id]}
+            headers={table.headers}
+            name={table.subTitle}
+            subTable
+          />
+        </Collapse>
+      </TableCell>
+    </TableRow>
   );
 }
 
 const DataRow = React.memo(function DataRow(props) {
   const { rowValues, headers, selectRows, isSelected, handleClick } = props;
-  const subTables = headers.filter((header) => header.subRow);
-  const component = headers.filter((header) => !header.subRow);
+  const { subTables, columns } = React.useMemo(() => splitHeaders(headers), [
+    headers,
+  ]);
   const hideBadge = props.hideBadge || false;
-
   const isItemSelected = isSelected(props.rowID);
-
   const [reveal, setReveal] = React.useState(
     Array.from({ length: subTables.length }).fill(false),
   );
 
-  const revealSubRow = React.useCallback((index) => {
+  const toggleSubRow = React.useCallback((index) => {
     setReveal((previous) => {
-      previous[index] = !previous[index];
-      return [...previous];
+      const next = [...previous];
+      next[index] = !next[index];
+      return next;
     });
   }, []);
-
-  const generateCell = React.useCallback(
-    (value, key, cellProps) => (
-      <TableCell key={key} {...cellProps}>
-        {value}
-      </TableCell>
-    ),
-    [],
-  );
 
   return (
     <>
@@ -469,71 +644,25 @@ const DataRow = React.memo(function DataRow(props) {
           </TableCell>
         )}
         {subTables.map((header, index) => (
-          <TableCell key={index}>
-            <Tooltip
-              title={reveal[index] ? `Hide ${header.id}` : `Show ${header.id}`}
-            >
-              <Box>
-                <IconButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    revealSubRow(index);
-                  }}
-                  disabled={rowValues[header.id].length === 0}
-                  color={header.iconColor || "secondary"}
-                >
-                  <Badge
-                    badgeContent={rowValues[header.id].length}
-                    invisible={hideBadge}
-                    anchorOrigin={{
-                      vertical: "bottom",
-                      horizontal: "right",
-                    }}
-                    sx={{
-                      "& .MuiBadge-badge": {
-                        color: (theme) => theme.palette.text.primary,
-                      },
-                    }}
-                  >
-                    {reveal[index]
-                      ? header?.closeIcon || <RemoveCircle />
-                      : header?.openIcon || <AddCircle />}
-                  </Badge>
-                </IconButton>
-              </Box>
-            </Tooltip>
-          </TableCell>
+          <SubRowToggleCell
+            key={header.id || index}
+            header={header}
+            isOpen={reveal[index]}
+            onToggle={() => toggleSubRow(index)}
+            rowValues={rowValues}
+            hideBadge={hideBadge}
+          />
         ))}
-        {component.map((header, index) => {
-          const value = header.date
-            ? new Date(rowValues[header.id]).toDateString() +
-              " " +
-              new Date(rowValues[header.id]).toLocaleTimeString()
-            : rowValues[header.id];
-          const cell = header.component
-            ? generateCell(header.component(rowValues), index, header.cellProps)
-            : generateCell(value, index, header.cellProps);
-          return cell;
-        })}
+        {renderDataCells(columns, rowValues)}
       </TableRow>
       {subTables.map((table, index) => (
-        <TableRow key={index}>
-          <TableCell
-            colSpan={props.headers.length + 1}
-            style={{ paddingBottom: 0, paddingTop: 0 }}
-          >
-            <Collapse in={reveal[index]} timeout="auto" unmountOnExit>
-              <UniversalTable
-                loading={table.loading}
-                setLoading={table.setLoading}
-                data={rowValues[table.id]}
-                headers={table.headers}
-                name={table.subTitle}
-                subTable
-              />
-            </Collapse>
-          </TableCell>
-        </TableRow>
+        <SubTableRow
+          key={table.id || index}
+          table={table}
+          isOpen={reveal[index]}
+          rowValues={rowValues}
+          colSpan={props.headers.length + 1}
+        />
       ))}
     </>
   );
@@ -580,8 +709,7 @@ function stableSort(array, comparator, headers) {
 function SearchArea(props) {
   const { current, setFinalVal } = props;
   const searchVal = React.useMemo(
-    () =>
-      current || sessionStorage.getItem(`searchVal:${props.searchName}`) || "",
+    () => current || sessionStorage.getItem(`searchVal:${props.searchName}`) || "",
     [current, props.searchName],
   );
 
@@ -598,7 +726,7 @@ function ReloadBtn({ setLoading, loading }) {
   }
 
   return (
-    <Tooltip title={"Reload"}>
+    <Tooltip title="Reload">
       <Button
         variant="contained"
         color="primary"
@@ -611,7 +739,6 @@ function ReloadBtn({ setLoading, loading }) {
   );
 }
 
-// Add PropTypes for the main component
 UniversalTable.propTypes = {
   loading: PropTypes.bool,
   setLoading: PropTypes.func,
@@ -630,7 +757,36 @@ UniversalTable.propTypes = {
   onSelection: PropTypes.func,
 };
 
-// PropTypes for internal components
+TableSelectionBanner.propTypes = {
+  selected: PropTypes.array.isRequired,
+  onSelection: PropTypes.func,
+  selectIcon: PropTypes.element,
+};
+
+TableTitle.propTypes = {
+  name: PropTypes.string,
+  subTable: PropTypes.bool,
+};
+
+TableToolbarContent.propTypes = {
+  setLoading: PropTypes.func,
+  reloadBtnLoading: PropTypes.bool,
+  searchDets: PropTypes.string,
+  onSearchChange: PropTypes.func.isRequired,
+  name: PropTypes.string,
+};
+
+EnhancedTableHead.propTypes = {
+  onRequestSort: PropTypes.func.isRequired,
+  order: PropTypes.oneOf(["asc", "desc"]).isRequired,
+  orderBy: PropTypes.string.isRequired,
+  headings: PropTypes.array.isRequired,
+  selectRows: PropTypes.bool,
+  numSelected: PropTypes.number,
+  rowCount: PropTypes.number,
+  onSelectAllClick: PropTypes.func,
+};
+
 EnhancedTable.propTypes = {
   headers: PropTypes.array.isRequired,
   rows: PropTypes.array.isRequired,
@@ -643,6 +799,21 @@ EnhancedTable.propTypes = {
   selected: PropTypes.array,
   selectID: PropTypes.string,
   resetFlag: PropTypes.string,
+};
+
+SubRowToggleCell.propTypes = {
+  header: PropTypes.object.isRequired,
+  isOpen: PropTypes.bool.isRequired,
+  onToggle: PropTypes.func.isRequired,
+  rowValues: PropTypes.object.isRequired,
+  hideBadge: PropTypes.bool,
+};
+
+SubTableRow.propTypes = {
+  table: PropTypes.object.isRequired,
+  isOpen: PropTypes.bool.isRequired,
+  rowValues: PropTypes.object.isRequired,
+  colSpan: PropTypes.number.isRequired,
 };
 
 DataRow.propTypes = {
