@@ -462,12 +462,14 @@ function EnhancedTable(props) {
 
             <TableBody>
               {visibleRows.map((row, index) => {
-                const rowIndex = page * rowsPerPage + index;
-                const rowID = getSelectableRowId(row, rowIndex, selectID);
+                const rowKey = selectID
+                  ? row[selectID]
+                  : `row-${page * rowsPerPage + index}`;
+                const rowID = getSelectableRowId(row, index, selectID);
 
                 return (
                   <DataRow
-                    key={rowID}
+                    key={rowKey}
                     rowID={rowID}
                     headers={headers}
                     rowValues={row}
@@ -536,7 +538,7 @@ function formatCellValue(header, rowValues) {
 
 function renderDataCells(headers, rowValues) {
   return headers.map((header, index) => (
-    <TableCell key={`${header.id}-${index}`} {...header.cellProps}>
+    <TableCell key={header.id || index} {...header.cellProps}>
       {header.component
         ? header.component(rowValues)
         : formatCellValue(header, rowValues)}
