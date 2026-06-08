@@ -28,6 +28,24 @@ You can install this repository directly into another local project:
 npm install /absolute/path/to/MUI-universale-table
 ```
 
+If your app is configured with a folder link such as:
+
+```json
+"mui-universale-table": "file:../MUI-universale-table"
+```
+
+and you see `Invalid hook call`, you are likely loading multiple React instances during local development.
+
+Recommended local test flow (matches published package behavior):
+
+```bash
+# from this repository
+npm run pack:local
+
+# from your consuming app
+npm install ../MUI-universale-table/mui-universale-table-<version>.tgz
+```
+
 Notes:
 
 - This package runs `prepare`, so the `dist/` output is built automatically during local installs.

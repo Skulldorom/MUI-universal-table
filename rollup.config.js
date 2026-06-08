@@ -6,6 +6,14 @@ import { readFileSync } from "fs";
 
 const packageJson = JSON.parse(readFileSync("./package.json", "utf8"));
 
+const peerDependencyExternals = [
+  /^react(?:\/.*)?$/,
+  /^react-dom(?:\/.*)?$/,
+  /^@mui\/(?:.*)$/,
+  /^@emotion\/(?:.*)$/,
+  /^prop-types(?:\/.*)?$/,
+];
+
 export default [
   {
     input: "src/index.js",
@@ -43,14 +51,7 @@ export default [
       }),
       commonjs(),
     ],
-    external: [
-      "react",
-      "react-dom",
-      "@mui/material",
-      "@mui/icons-material",
-      "@emotion/react",
-      "@emotion/styled",
-      "prop-types",
-    ],
+    external: (id) =>
+      peerDependencyExternals.some((pattern) => pattern.test(id)),
   },
 ];
