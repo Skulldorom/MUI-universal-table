@@ -20,7 +20,7 @@ test("renders UniversalTable without crashing", () => {
       headers={headers}
       name="Test Users"
       loading={false}
-    />
+    />,
   );
   expect(screen.getByText("Test Users")).toBeInTheDocument();
 });
@@ -32,8 +32,23 @@ test("renders table rows", () => {
       headers={headers}
       name="Test Users"
       loading={false}
-    />
+    />,
   );
   expect(screen.getByText("John Doe")).toBeInTheDocument();
   expect(screen.getByText("Jane Smith")).toBeInTheDocument();
+});
+
+test("does not render reload button when setLoading is not provided", () => {
+  render(
+    <UniversalTable
+      data={data}
+      headers={headers}
+      name="Test Users"
+      loading={false}
+    />,
+  );
+
+  expect(
+    screen.queryByRole("button", { name: /reload/i }),
+  ).not.toBeInTheDocument();
 });

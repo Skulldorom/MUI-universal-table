@@ -107,7 +107,7 @@ export default function UniversalTable({
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
       const newSelected = rows.map((row, index) =>
-        selectID ? row[selectID] : index
+        selectID ? row[selectID] : index,
       );
       setSelected(newSelected);
       return;
@@ -115,20 +115,23 @@ export default function UniversalTable({
     setSelected([]);
   };
 
-  const handleClick = React.useCallback((event, id) => {
-    if (!selectRows) return;
-    const selectedIndex = selected.indexOf(id);
-    let newSelected = [];
+  const handleClick = React.useCallback(
+    (event, id) => {
+      if (!selectRows) return;
+      const selectedIndex = selected.indexOf(id);
+      let newSelected = [];
 
-    if (selectedIndex === -1) {
-      // Item not selected, add it
-      newSelected = [...selected, id];
-    } else {
-      // Item is selected, remove it
-      newSelected = selected.filter((selectedId) => selectedId !== id);
-    }
-    setSelected(newSelected);
-  }, [selected, selectRows]);
+      if (selectedIndex === -1) {
+        // Item not selected, add it
+        newSelected = [...selected, id];
+      } else {
+        // Item is selected, remove it
+        newSelected = selected.filter((selectedId) => selectedId !== id);
+      }
+      setSelected(newSelected);
+    },
+    [selected, selectRows],
+  );
 
   return (
     <>
@@ -151,7 +154,7 @@ export default function UniversalTable({
               bgcolor: (theme) =>
                 alpha(
                   theme.palette.primary.main,
-                  theme.palette.action.activatedOpacity
+                  theme.palette.action.activatedOpacity,
                 ),
               borderRadius: 1,
               borderBottomLeftRadius: 0,
@@ -185,7 +188,10 @@ export default function UniversalTable({
             <Stack
               spacing={2}
               direction={{ xs: "column", md: "row" }}
-              sx={{ width: "100%", alignItems: { xs: "flex-start", md: "center" } }}
+              sx={{
+                width: "100%",
+                alignItems: { xs: "flex-start", md: "center" },
+              }}
             >
               <Box sx={{ flex: "1 1 100%" }} id="tableTitle">
                 <ReloadBtn setLoading={setLoading} loading={reloadBtnLoading} />
@@ -295,7 +301,7 @@ function EnhancedTable(props) {
   const subTable = props.subTable;
   const rows = props.rows;
   const [rowsPerPage, setRowsPerPage] = React.useState(
-    subTable ? rows.length : 5
+    subTable ? rows.length : 5,
   );
   const selected = props.selected;
   const selectID = props.selectID;
@@ -335,15 +341,18 @@ function EnhancedTable(props) {
     return [5, 10, 25, 50, 100, rows.length];
   };
 
-  const isSelected = React.useCallback((id) => selected.includes(id), [selected]);
+  const isSelected = React.useCallback(
+    (id) => selected.includes(id),
+    [selected],
+  );
 
   const visibleRows = React.useMemo(
     () =>
       stableSort(rows, getComparator(order, orderBy), props.headers).slice(
         page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
+        page * rowsPerPage + rowsPerPage,
       ),
-    [rows, order, orderBy, props.headers, page, rowsPerPage]
+    [rows, order, orderBy, props.headers, page, rowsPerPage],
   );
 
   return (
@@ -367,22 +376,22 @@ function EnhancedTable(props) {
 
               <TableBody>
                 {visibleRows.map((row, index) => {
-                    const rowKey = selectID
-                      ? row[selectID]
-                      : `row-${page * rowsPerPage + index}`;
-                    return (
-                      <DataRow
-                        key={rowKey}
-                        rowID={selectID ? row[selectID] : index}
-                        headers={props.headers}
-                        rowValues={row}
-                        hideBadge={props.hideBadge}
-                        selectRows={props.selectRows}
-                        handleClick={props.handleClick}
-                        isSelected={isSelected}
-                      />
-                    );
-                  })}
+                  const rowKey = selectID
+                    ? row[selectID]
+                    : `row-${page * rowsPerPage + index}`;
+                  return (
+                    <DataRow
+                      key={rowKey}
+                      rowID={selectID ? row[selectID] : index}
+                      headers={props.headers}
+                      rowValues={row}
+                      hideBadge={props.hideBadge}
+                      selectRows={props.selectRows}
+                      handleClick={props.handleClick}
+                      isSelected={isSelected}
+                    />
+                  );
+                })}
                 {!subTable && emptyRows > 0 && (
                   <TableRow style={{ height: (dense ? 33 : 53) * emptyRows }}>
                     <TableCell colSpan={props.headers.length} />
@@ -422,7 +431,7 @@ const DataRow = React.memo(function DataRow(props) {
   const isItemSelected = isSelected(props.rowID);
 
   const [reveal, setReveal] = React.useState(
-    Array.from({ length: subTables.length }).fill(false)
+    Array.from({ length: subTables.length }).fill(false),
   );
 
   const revealSubRow = React.useCallback((index) => {
@@ -438,7 +447,7 @@ const DataRow = React.memo(function DataRow(props) {
         {value}
       </TableCell>
     ),
-    []
+    [],
   );
 
   return (
@@ -548,7 +557,7 @@ function getComparator(order, orderBy) {
 
 function stableSort(array, comparator, headers) {
   const dateColumns = new Set(
-    headers.filter((object) => object.date).map((value) => value.id)
+    headers.filter((object) => object.date).map((value) => value.id),
   );
   const stabilizedThis = array.map((el, index) => [{ ...el }, index]);
 
@@ -573,7 +582,7 @@ function SearchArea(props) {
   const searchVal = React.useMemo(
     () =>
       current || sessionStorage.getItem(`searchVal:${props.searchName}`) || "",
-    [current, props.searchName]
+    [current, props.searchName],
   );
 
   return (
@@ -584,6 +593,10 @@ function SearchArea(props) {
 }
 
 function ReloadBtn({ setLoading, loading }) {
+  if (typeof setLoading !== "function") {
+    return null;
+  }
+
   return (
     <Tooltip title={"Reload"}>
       <Button
@@ -649,6 +662,6 @@ SearchArea.propTypes = {
 };
 
 ReloadBtn.propTypes = {
-  setLoading: PropTypes.func.isRequired,
+  setLoading: PropTypes.func,
   loading: PropTypes.bool,
 };
