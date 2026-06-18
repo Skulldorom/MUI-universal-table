@@ -1,32 +1,12 @@
 import React from "react";
 import PropTypes from "prop-types";
 import {
-  Badge,
-  Box,
   Checkbox,
-  Collapse,
-  IconButton,
   TableCell,
   TableRow,
-  Tooltip,
 } from "@mui/material";
-import { AddCircle, RemoveCircle } from "@mui/icons-material";
-// UniversalTable is imported here for sub-table rendering (circular dep is safe
-// because the reference is only resolved at JSX render time, not module load time)
-import UniversalTable from "../UniversalTable";
-import { splitHeaders } from "../utils/tableUtils";
-
-function formatCellValue(header, rowValues) {
-  if (!header.date) {
-    return rowValues[header.id];
-  }
-
-  return (
-    new Date(rowValues[header.id]).toDateString() +
-    " " +
-    new Date(rowValues[header.id]).toLocaleTimeString()
-  );
-}
+import { SubRowToggleCell, SubTableRow } from "./SubTableRow";
+import { splitHeaders, formatCellValue } from "../utils/tableUtils";
 
 function renderDataCells(headers, rowValues) {
   return headers.map((header, index) => (
@@ -37,83 +17,6 @@ function renderDataCells(headers, rowValues) {
     </TableCell>
   ));
 }
-
-function SubRowToggleCell({
-  header,
-  isOpen,
-  onToggle,
-  rowValues,
-  hideBadge,
-}) {
-  return (
-    <TableCell>
-      <Tooltip title={isOpen ? `Hide ${header.id}` : `Show ${header.id}`}>
-        <Box>
-          <IconButton
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggle();
-            }}
-            disabled={rowValues[header.id].length === 0}
-            color={header.iconColor || "secondary"}
-          >
-            <Badge
-              badgeContent={rowValues[header.id].length}
-              invisible={hideBadge}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "right",
-              }}
-              sx={{
-                "& .MuiBadge-badge": {
-                  color: (theme) => theme.palette.text.primary,
-                },
-              }}
-            >
-              {isOpen
-                ? header?.closeIcon || <RemoveCircle />
-                : header?.openIcon || <AddCircle />}
-            </Badge>
-          </IconButton>
-        </Box>
-      </Tooltip>
-    </TableCell>
-  );
-}
-
-SubRowToggleCell.propTypes = {
-  header: PropTypes.object.isRequired,
-  isOpen: PropTypes.bool.isRequired,
-  onToggle: PropTypes.func.isRequired,
-  rowValues: PropTypes.object.isRequired,
-  hideBadge: PropTypes.bool,
-};
-
-function SubTableRow({ table, isOpen, rowValues, colSpan }) {
-  return (
-    <TableRow>
-      <TableCell colSpan={colSpan} style={{ paddingBottom: 0, paddingTop: 0 }}>
-        <Collapse in={isOpen} timeout="auto" unmountOnExit>
-          <UniversalTable
-            loading={table.loading}
-            setLoading={table.setLoading}
-            data={rowValues[table.id]}
-            headers={table.headers}
-            name={table.subTitle}
-            subTable
-          />
-        </Collapse>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-SubTableRow.propTypes = {
-  table: PropTypes.object.isRequired,
-  isOpen: PropTypes.bool.isRequired,
-  rowValues: PropTypes.object.isRequired,
-  colSpan: PropTypes.number.isRequired,
-};
 
 const DataRow = React.memo(function DataRow(props) {
   const { rowValues, headers, selectRows, isSelected, handleClick } = props;
@@ -134,14 +37,25 @@ const DataRow = React.memo(function DataRow(props) {
     });
   }, []);
 
+  const handleRowKeyDown = React.useCallback(
+    (event) => {
+      if (selectRows && (event.key === " " || event.key === "Enter")) {
+        event.preventDefault();
+        handleClick(event, props.rowID);
+      }
+    },
+    [selectRows, handleClick, props.rowID],
+  );
+
   return (
     <>
       <TableRow
-        tabIndex={-1}
+        tabIndex={selectRows ? 0 : -1}
         hover={selectRows}
         role={selectRows ? "checkbox" : "row"}
         selected={isItemSelected}
         aria-checked={isItemSelected}
+        onKeyDown={handleRowKeyDown}
       >
         {selectRows && (
           <TableCell padding="checkbox">

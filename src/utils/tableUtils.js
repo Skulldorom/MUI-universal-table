@@ -78,19 +78,42 @@ export function getComparator(order, orderBy) {
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
+/**
+ * Format a cell value for display. Handles dates safely:
+ * returns the raw value for non-date headers, and a formatted
+ * date string for date headers (guards against invalid dates).
+ */
+export function formatCellValue(header, rowValues) {
+  const raw = rowValues[header.id];
+  if (!header.date) {
+    return raw;
+  }
+
+  const timestamp = Date.parse(raw);
+  if (Number.isNaN(timestamp)) {
+    return raw;
+  }
+
+  const d = new Date(timestamp);
+  return d.toDateString() + " " + d.toLocaleTimeString();
+}
+
 export function stableSort(array, comparator, headers) {
   const dateColumns = new Set(
     headers.filter((object) => object.date).map((value) => value.id),
   );
-  const stabilizedThis = array.map((el, index) => [{ ...el }, index]);
 
-  for (const item of stabilizedThis) {
-    const object = item[0];
-    for (const property in object) {
-      if (dateColumns.has(property))
-        object[property] = Number(new Date(object[property]));
+  // Build stable entries — compare pre-computed sort keys so we never
+  // mutate the original data or its shallow copies.
+  const stabilizedThis = array.map((el, index) => {
+    const sortKey = { ...el };
+    for (const property in sortKey) {
+      if (dateColumns.has(property)) {
+        sortKey[property] = Number(new Date(sortKey[property]));
+      }
     }
-  }
+    return [sortKey, index];
+  });
 
   stabilizedThis.sort((a, b) => {
     const order = comparator(a[0], b[0]);
@@ -99,3 +122,5 @@ export function stableSort(array, comparator, headers) {
   });
   return stabilizedThis.map((el) => el[0]);
 }
+
+
