@@ -328,23 +328,34 @@ import { formatCellValue } from "../src/utils/tableUtils.js";
 
 const dateHeader = { id: "date", label: "Date", date: true };
 const stringHeader = { id: "name", label: "Name" };
+const expectedLocalDateTime = (value) =>
+  new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(value));
 
 test("formatCellValue formats ISO date string", () => {
-  const result = formatCellValue(dateHeader, { date: "2024-01-15T10:30:00Z" });
-  expect(result).toContain("2024");
-  expect(result).toContain("Jan");
-  expect(result).toContain("15");
-  expect(result).toContain(":");
+  const value = "2024-01-15T10:30:00Z";
+  const result = formatCellValue(dateHeader, { date: value });
+  expect(result).toBe(expectedLocalDateTime(value));
 });
 
 test("formatCellValue formats epoch-millisecond number (regression guard)", () => {
   // This was the specific regression: Date.parse(1705324800000) returns NaN
   const epochMs = new Date("2024-01-15T10:30:00Z").getTime();
   const result = formatCellValue(dateHeader, { date: epochMs });
-  expect(result).toContain("2024");
-  expect(result).toContain("Jan");
-  expect(result).toContain("15");
-  expect(result).toContain(":");
+  expect(result).toBe(expectedLocalDateTime(epochMs));
+});
+
+test("formatCellValue formats utc strings in browser-local 12-hour time", () => {
+  const value = "Fri, 19 Jun 2026 12:43:13 GMT";
+  const result = formatCellValue(dateHeader, { date: value });
+  expect(result).toBe(expectedLocalDateTime(value));
+  expect(result).not.toContain("GMT");
 });
 
 test("formatCellValue returns raw value for invalid date", () => {
@@ -368,10 +379,9 @@ test("formatCellValue returns raw value for non-date column", () => {
 });
 
 test("formatCellValue handles a Date object", () => {
-  const result = formatCellValue(dateHeader, { date: new Date("2024-01-15T10:30:00Z") });
-  expect(result).toContain("2024");
-  expect(result).toContain("Jan");
-  expect(result).toContain("15");
+  const value = new Date("2024-01-15T10:30:00Z");
+  const result = formatCellValue(dateHeader, { date: value });
+  expect(result).toBe(expectedLocalDateTime(value));
 });
 
 test("renders date column formatted in the table", () => {
@@ -389,8 +399,8 @@ test("renders date column formatted in the table", () => {
     <UniversalTable data={dateData} headers={dateHeaders} name="Dates" loading={false} />,
   );
 
-  // ISO string → formatted, epoch ms → also formatted (same date, different time)
-  expect(screen.getAllByText(/Jan 15 2024/).length).toBe(2);
+  expect(screen.getByText(expectedLocalDateTime(dateData[0].timestamp))).toBeInTheDocument();
+  expect(screen.getByText(expectedLocalDateTime(dateData[1].timestamp))).toBeInTheDocument();
   // "invalid" → shown as-is (fallback)
   expect(screen.getByText("invalid")).toBeInTheDocument();
 });
