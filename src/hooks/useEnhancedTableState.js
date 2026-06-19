@@ -8,7 +8,12 @@ export default function useEnhancedTableState({
 }) {
   const firstSortableId = React.useMemo(() => {
     if (!headers || headers.length === 0) return "";
-    return headers[0].id;
+    for (const header of headers) {
+      if (!header.subRow) {
+        return header.id;
+      }
+    }
+    return "";
   }, [headers]);
 
   const [order, setOrder] = React.useState("desc");
