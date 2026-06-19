@@ -78,6 +78,15 @@ export function getComparator(order, orderBy) {
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
+const browserDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
 /**
  * Format a cell value for display. Handles dates safely:
  * returns the raw value for non-date headers, and a formatted
@@ -103,11 +112,7 @@ export function formatCellValue(header, rowValues) {
     return raw;
   }
 
-  return d.toDateString() + " " + d.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  return browserDateTimeFormatter.format(d);
 }
 
 export function stableSort(array, comparator, headers) {
@@ -142,5 +147,4 @@ export function stableSort(array, comparator, headers) {
   });
   return stabilizedThis.map((el) => el[0]);
 }
-
 
