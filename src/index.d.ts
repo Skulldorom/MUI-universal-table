@@ -21,6 +21,9 @@ export interface TableHeader {
   loading?: boolean;
   // eslint-disable-next-line no-unused-vars
   setLoading?: (loading: boolean) => void;
+  /** Preferred callback — fires when the user clicks reload on a sub-table. */
+  // eslint-disable-next-line no-unused-vars
+  onReload?: () => void;
   subTitle?: string;
 }
 
@@ -33,9 +36,12 @@ export interface UniversalTableProps {
   name?: string;
   /** Shows loading state */
   loading?: boolean;
-  /** Function to control loading state */
+  /** Function to control loading state (legacy — prefer onReload) */
   // eslint-disable-next-line no-unused-vars
   setLoading?: (loading: boolean) => void;
+  /** Fires when the user clicks the reload button */
+  // eslint-disable-next-line no-unused-vars
+  onReload?: () => void;
   /** Enable lazy loading indicator */
   lazyloading?: boolean;
   /** Current page for lazy loading */
@@ -57,6 +63,10 @@ export interface UniversalTableProps {
   /** Callback when rows are selected */
   // eslint-disable-next-line no-unused-vars
   onSelection?: (selectedIds: unknown[]) => void;
+  /** Override default page size options (e.g. [10, 25, 50]) */
+  pageSizeOptions?: number[];
+  /** Persist search term to sessionStorage (requires name prop) */
+  persistSearch?: boolean;
 }
 
 declare const UniversalTable: React.FC<UniversalTableProps>;

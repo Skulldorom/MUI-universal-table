@@ -16,8 +16,7 @@ export default function FancySearch({ value, onSubmit }) {
   const expanded = hover || Boolean(search);
 
   const handleSubmit = (e) => {
-    e.preventDefault(); // Prevent the form from actually submitting
-
+    e.preventDefault();
     onSubmit(search);
   };
 
@@ -25,12 +24,24 @@ export default function FancySearch({ value, onSubmit }) {
     setHover(false);
   };
 
+  // Sync internal state when the parent clears/changes the search term.
+  // A ref tracks whether this sync came from the user typing or from a parent
+  // update, so the debounce only fires for genuine user input.
+  const isUserType = React.useRef(false);
+
   React.useEffect(() => {
-    // if the value hasnt changed after a short internal call the function
-    const timer = setTimeout(() => {
-      onSubmit(search);
-    }, 700);
-    return () => clearTimeout(timer);
+    if (isUserType.current) {
+      // User is typing — debounce as normal
+      isUserType.current = false;
+      const timer = setTimeout(() => {
+        onSubmit(search);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+    // External value change (parent reset, clear from clearSelection, etc.)
+    // — sync state and do NOT fire a stale debounce.
+    setSearch(value);
+    return undefined;
   }, [search, value, onSubmit]);
 
   return (
@@ -38,12 +49,12 @@ export default function FancySearch({ value, onSubmit }) {
       <Paper
         elevation={0}
         sx={{
-          borderRadius: expanded ? "24px" : "50px", // changes when hover starts or ends
+          borderRadius: expanded ? "24px" : "50px",
           display: "flex",
           alignItems: "center",
-          transition: "all 0.5s ease-in-out", // smooth transition in both directions
-          p: expanded ? 1 : 0.5, // smooth padding transition
-          width: "fit-content", // fit content to children
+          transition: "all 0.5s ease-in-out",
+          p: expanded ? 1 : 0.5,
+          width: "fit-content",
           border: (theme) => `1px solid ${theme.palette.divider}`,
           mb: 1,
         }}
@@ -54,18 +65,21 @@ export default function FancySearch({ value, onSubmit }) {
         <InputBase
           placeholder="Search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            isUserType.current = true;
+            setSearch(e.target.value);
+          }}
           sx={{
             ml: 1,
-            width: expanded ? "100%" : 0, // animate width in both hover states
-            transition: "width 0.5s ease-in-out", // smooth width change
-            ...(expanded ? {} : { margin: 0 }), // remove margin when not hovering
+            width: expanded ? "100%" : 0,
+            transition: "width 0.5s ease-in-out",
+            ...(expanded ? {} : { margin: 0 }),
           }}
           onBlur={handleEndHover}
         />
 
         <Collapse
-          in={search ? true : false}
+          in={Boolean(search)}
           orientation="horizontal"
           unmountOnExit
         >
@@ -73,11 +87,16 @@ export default function FancySearch({ value, onSubmit }) {
             direction="row"
             alignItems="center"
             spacing={0}
-            sx={{
-              mr: 3,
-            }}
+            sx={{ mr: 3 }}
           >
-            <IconButton onClick={() => setSearch("")}>
+            <IconButton
+              onClick={() => {
+                isUserType.current = false;
+                setSearch("");
+                // Immediately clear instead of waiting for the debounce
+                onSubmit("");
+              }}
+            >
               <Clear />
             </IconButton>
             <Divider orientation="vertical" flexItem />

@@ -12,6 +12,7 @@ import EnhancedTable from "./components/EnhancedTable";
 export default function UniversalTable({
   loading,
   setLoading,
+  onReload,
   lazyloading = false,
   currentPage,
   totalPages,
@@ -25,6 +26,8 @@ export default function UniversalTable({
   selectID,
   selectIcon,
   onSelection,
+  pageSizeOptions,
+  persistSearch,
 }) {
   const head = headers || [];
   const { rows, searchTerm, setSearchTerm } = useSearchableRows(data, head);
@@ -64,10 +67,12 @@ export default function UniversalTable({
         {!subTable && (
           <TableToolbarContent
             setLoading={setLoading}
+            onReload={onReload}
             reloadBtnLoading={reloadBtnLoading}
             searchTerm={searchTerm}
             onSearchChange={handleSearchChange}
             name={name}
+            persistSearch={persistSearch}
           />
         )}
         <EnhancedTable
@@ -82,6 +87,8 @@ export default function UniversalTable({
           handleClick={handleClick}
           selected={selected}
           selectID={selectID}
+          pageSizeOptions={pageSizeOptions}
+          name={name}
         />
       </Paper>
     </>
@@ -91,6 +98,8 @@ export default function UniversalTable({
 UniversalTable.propTypes = {
   loading: PropTypes.bool,
   setLoading: PropTypes.func,
+  /** Preferred callback — fires when the user clicks reload. */
+  onReload: PropTypes.func,
   lazyloading: PropTypes.bool,
   currentPage: PropTypes.number,
   totalPages: PropTypes.number,
@@ -104,4 +113,8 @@ UniversalTable.propTypes = {
   selectID: PropTypes.string,
   selectIcon: PropTypes.element,
   onSelection: PropTypes.func,
+  /** Override default page size options (e.g. [10, 25, 50]). Default auto-computed. */
+  pageSizeOptions: PropTypes.arrayOf(PropTypes.number),
+  /** Persist search term to sessionStorage (requires name prop). Default: false */
+  persistSearch: PropTypes.bool,
 };

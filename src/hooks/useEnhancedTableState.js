@@ -1,8 +1,13 @@
 import React from "react";
 
-export default function useEnhancedTableState({ rows, subTable, resetFlag }) {
+export default function useEnhancedTableState({ rows, subTable, resetFlag, headers }) {
+  const firstSortableId = React.useMemo(() => {
+    if (!headers || headers.length === 0) return "";
+    return headers[0].id;
+  }, [headers]);
+
   const [order, setOrder] = React.useState("desc");
-  const [orderBy, setOrderBy] = React.useState("");
+  const [orderBy, setOrderBy] = React.useState(firstSortableId);
   const [pagination, setPagination] = React.useState(() => ({
     page: 0,
     rowsPerPage: subTable ? rows.length : 5,

@@ -35,10 +35,13 @@ function EnhancedTable(props) {
     rows,
     subTable,
     resetFlag: props.resetFlag,
+    headers,
   });
 
-  const emptyRows =
-    rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage);
+  const emptyRows = Math.max(
+    0,
+    rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage),
+  );
 
   const isSelected = React.useCallback(
     (id) => selected.includes(id),
@@ -56,7 +59,11 @@ function EnhancedTable(props) {
 
   return (
     <TableContainer>
-      <Table sx={{ minWidth: 750 }} size={dense ? "small" : "medium"}>
+      <Table
+        sx={{ minWidth: 750 }}
+        size={dense ? "small" : "medium"}
+        aria-label={props.name || "data table"}
+      >
         {props.loading ? (
           <TableLoader />
         ) : (
@@ -105,7 +112,7 @@ function EnhancedTable(props) {
         <Box sx={{ mb: 3 }} />
       ) : (
         <TablePagination
-          rowsPerPageOptions={getPageOptions(rows.length)}
+          rowsPerPageOptions={props.pageSizeOptions || getPageOptions(rows.length)}
           component="div"
           count={rows.length}
           rowsPerPage={rowsPerPage}
@@ -133,6 +140,8 @@ EnhancedTable.propTypes = {
   selected: PropTypes.array,
   selectID: PropTypes.string,
   resetFlag: PropTypes.string,
+  pageSizeOptions: PropTypes.arrayOf(PropTypes.number),
+  name: PropTypes.string,
 };
 
 export default EnhancedTable;

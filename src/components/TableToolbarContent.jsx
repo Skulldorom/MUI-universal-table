@@ -6,10 +6,12 @@ import SearchArea from "./SearchArea";
 
 function TableToolbarContent({
   setLoading,
+  onReload,
   reloadBtnLoading,
   searchTerm,
   onSearchChange,
   name,
+  persistSearch,
 }) {
   return (
     <Toolbar
@@ -28,12 +30,13 @@ function TableToolbarContent({
         }}
       >
         <Box sx={{ flex: "1 1 100%" }} id="tableTitle">
-          <ReloadBtn setLoading={setLoading} loading={reloadBtnLoading} />
+          <ReloadBtn setLoading={setLoading} onReload={onReload} loading={reloadBtnLoading} />
         </Box>
         <SearchArea
           current={searchTerm}
           setFinalVal={onSearchChange}
           searchName={name}
+          persistSearch={persistSearch}
         />
       </Stack>
     </Toolbar>
@@ -42,10 +45,12 @@ function TableToolbarContent({
 
 TableToolbarContent.propTypes = {
   setLoading: PropTypes.func,
+  onReload: PropTypes.func,
   reloadBtnLoading: PropTypes.bool,
   searchTerm: PropTypes.string,
   onSearchChange: PropTypes.func.isRequired,
   name: PropTypes.string,
+  persistSearch: PropTypes.bool,
 };
 
 export default TableToolbarContent;
