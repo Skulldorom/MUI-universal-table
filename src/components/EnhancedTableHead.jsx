@@ -1,6 +1,13 @@
 import React from "react";
 import PropTypes from "prop-types";
-import { Box, Checkbox, TableCell, TableHead, TableRow, TableSortLabel } from "@mui/material";
+import {
+  Box,
+  Checkbox,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableSortLabel,
+} from "@mui/material";
 import { visuallyHidden } from "../utils/tableUtils";
 
 function EnhancedTableHead(props) {
@@ -42,6 +49,7 @@ function EnhancedTableHead(props) {
               active={orderBy === headCell.id}
               direction={orderBy === headCell.id ? order : "asc"}
               onClick={createSortHandler(headCell.id)}
+              disabled={headCell.subRow}
             >
               {headCell.label}
               {orderBy === headCell.id ? (
