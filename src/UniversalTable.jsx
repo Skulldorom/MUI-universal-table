@@ -60,7 +60,7 @@ export default function UniversalTable({
       clearTimeout(debounceRef.current);
 
       debounceRef.current = setTimeout(() => {
-        setLoading({ searchValue, order, orderBy });
+        setLoading({ searchValue, direction: order, column: orderBy });
       }, 500);
     } else {
       handleSearchChange(searchValue);
