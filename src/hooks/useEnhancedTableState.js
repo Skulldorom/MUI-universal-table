@@ -61,8 +61,8 @@ export default function useEnhancedTableState({
 
   const handleSort = (column, api) => {
     if (api) {
-      const direction = orderBy === "asc" ? "desc" : "asc";
-      apiCall(searchTerm, column, direction);
+      const direction = order === "asc" ? "desc" : "asc";
+      apiCall({ searchTerm, column, direction });
       setOrder(direction);
       setOrderBy(column);
       return;
