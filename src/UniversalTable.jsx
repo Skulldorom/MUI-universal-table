@@ -29,7 +29,6 @@ export default function UniversalTable({
   pageSizeOptions,
   persistSearch,
   asyncPages,
-  onDataChange,
 }) {
   const debounceRef = React.useRef(null);
 
@@ -78,17 +77,6 @@ export default function UniversalTable({
   React.useEffect(() => {
     return () => clearTimeout(debounceRef.current);
   }, []);
-
-  React.useEffect(() => {
-    if (typeof onDataChange === "function") {
-      onDataChange({
-        searchTerm,
-        direction: order,
-        column: orderBy,
-        pages: asyncPages,
-      });
-    }
-  }, [searchTerm, order, orderBy, asyncPages, onDataChange]);
 
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {
@@ -184,6 +172,4 @@ UniversalTable.propTypes = {
   /** Persist search term to sessionStorage (requires name prop). Default: false */
   persistSearch: PropTypes.bool,
   asyncPages: PropTypes.number,
-  /** Called with `{ searchTerm, direction, column, pages }` whenever search or sort state changes. */
-  onDataChange: PropTypes.func,
 };

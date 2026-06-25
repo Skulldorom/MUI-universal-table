@@ -83,7 +83,6 @@ function MyTable() {
 | `selectIcon`       | `element`  | -            | Custom icon for selection action                                                                                                                          |
 | `pageSizeOptions`  | `number[]` | -            | Override default page size options (e.g. `[10, 25, 50]`)                                                                                                  |
 | `persistSearch`    | `bool`     | `false`      | Persist the search term to `sessionStorage` (requires `name` prop)                                                                                        |
-| `onDataChange`     | `func`     | -            | Called with `{ searchTerm, direction, column, pages }` whenever search term or sort state changes |
 
 ## Header Configuration
 
@@ -155,27 +154,7 @@ const headers = [
 ];
 ```
 
-### Accessing search/sort state externally
-
-Use `onDataChange` to receive the current search and sort state whenever it changes. Useful for persisting state, driving external UI, or syncing with other components.
-
-```jsx
-function MyTable() {
-  const [tableState, setTableState] = React.useState({});
-
-  return (
-    <>
-      <p>Search: {tableState.searchTerm} | Sort: {tableState.column} {tableState.direction}</p>
-      <UniversalTable
-        data={data}
-        headers={headers}
-        name="Users"
-        onDataChange={setTableState}
-      />
-    </>
-  );
-}
-```
+````
 
 The callback receives `{ searchTerm, direction, column, pages }`.
 
@@ -194,7 +173,7 @@ Every `setLoading` call in async mode passes the same object:
   direction: "asc" | "desc",
   pages: number,        // value of the asyncPages prop
 }
-```
+````
 
 This payload is sent on:
 
