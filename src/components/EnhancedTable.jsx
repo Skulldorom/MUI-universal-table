@@ -66,14 +66,14 @@ function EnhancedTable(props) {
     [selected],
   );
 
-  const visibleRows = React.useMemo(
-    () =>
-      stableSort(rows, getComparator(order, orderBy), headers).slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage,
-      ),
-    [headers, order, orderBy, page, rows, rowsPerPage],
-  );
+  const visibleRows = React.useMemo(() => {
+    return stableSort(
+      rows,
+      getComparator(order, orderBy),
+      headers,
+      orderBy,
+    ).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [headers, order, orderBy, page, rows, rowsPerPage]);
 
   return (
     <TableContainer>
