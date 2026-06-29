@@ -1,8 +1,17 @@
 import React from "react";
 
-export default function useEnhancedTableState({ rows, subTable, resetFlag }) {
-  const [order, setOrder] = React.useState("asc");
-  const [orderBy, setOrderBy] = React.useState("");
+export default function useEnhancedTableState({
+  rows,
+  subTable,
+  resetFlag,
+  apiCall,
+  searchTerm,
+  setOrder,
+  setOrderBy,
+  order,
+  orderBy,
+  asyncPages,
+}) {
   const [pagination, setPagination] = React.useState(() => ({
     page: 0,
     rowsPerPage: subTable ? rows.length : 5,
@@ -28,42 +37,47 @@ export default function useEnhancedTableState({ rows, subTable, resetFlag }) {
   const rowsPerPage = subTable ? rows.length : pagination.rowsPerPage;
 
   const handleRequestSort = React.useCallback(
-    (event, property) => {
+    (property) => {
       const isAsc = orderBy === property && order === "asc";
       setOrder(isAsc ? "desc" : "asc");
       setOrderBy(property);
     },
-    [order, orderBy],
+    [order, orderBy, setOrder, setOrderBy],
   );
 
-  const handleChangePage = React.useCallback(
-    (event, newPage) => {
-      setPagination((previous) => ({
-        ...previous,
-        page: newPage,
-      }));
-    },
-    [],
-  );
+  const handleChangePage = React.useCallback((event, newPage) => {
+    setPagination((previous) => ({
+      ...previous,
+      page: newPage,
+    }));
+  }, []);
 
-  const handleChangeRowsPerPage = React.useCallback(
-    (event) => {
-      setPagination((previous) => ({
-        ...previous,
-        page: 0,
-        rowsPerPage: Number.parseInt(event.target.value, 10),
-      }));
-    },
-    [],
-  );
+  const handleChangeRowsPerPage = React.useCallback((event) => {
+    setPagination((previous) => ({
+      ...previous,
+      page: 0,
+      rowsPerPage: Number.parseInt(event.target.value, 10),
+    }));
+  }, []);
+
+  const handleSort = (column, apiSortable) => {
+    if (apiSortable) {
+      const direction = order === "asc" ? "desc" : "asc";
+      apiCall({ searchTerm, column, direction, pages: asyncPages ?? 1 });
+      setOrder(direction);
+      setOrderBy(column);
+      return;
+    }
+    handleRequestSort(column);
+  };
 
   return {
     order,
     orderBy,
     page,
     rowsPerPage,
-    handleRequestSort,
     handleChangePage,
     handleChangeRowsPerPage,
+    handleSort,
   };
 }

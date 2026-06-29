@@ -8,6 +8,7 @@ import {
   TableRow,
   TableSortLabel,
 } from "@mui/material";
+
 import { visuallyHidden } from "../utils/tableUtils";
 
 function EnhancedTableHead(props) {
@@ -19,11 +20,8 @@ function EnhancedTableHead(props) {
     numSelected,
     rowCount,
     onSelectAllClick,
+    async,
   } = props;
-
-  const createSortHandler = (property) => (event) => {
-    onRequestSort(event, property);
-  };
 
   return (
     <TableHead>
@@ -48,7 +46,9 @@ function EnhancedTableHead(props) {
             <TableSortLabel
               active={orderBy === headCell.id}
               direction={orderBy === headCell.id ? order : "asc"}
-              onClick={createSortHandler(headCell.id)}
+              onClick={() =>
+                onRequestSort(headCell.id, headCell.sortable && async)
+              }
               disabled={headCell.subRow}
             >
               {headCell.label}
@@ -74,6 +74,7 @@ EnhancedTableHead.propTypes = {
   numSelected: PropTypes.number,
   rowCount: PropTypes.number,
   onSelectAllClick: PropTypes.func,
+  async: PropTypes.bool,
 };
 
 export default EnhancedTableHead;

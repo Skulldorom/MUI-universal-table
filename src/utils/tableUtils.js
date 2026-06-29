@@ -115,10 +115,11 @@ export function formatCellValue(header, rowValues) {
   return browserDateTimeFormatter.format(d);
 }
 
-export function stableSort(array, comparator, headers) {
+export function stableSort(array, comparator, headers, orderBy) {
   const dateColumns = new Set(
     headers.filter((object) => object.date).map((value) => value.id),
   );
+  const findHeader = headers.find((header) => header.id === orderBy);
 
   // Build stable entries — compare pre-computed sort keys so we never
   // mutate the original data or its shallow copies.
@@ -140,11 +141,12 @@ export function stableSort(array, comparator, headers) {
     return [el, sortKey, index];
   });
 
-  stabilizedThis.sort((a, b) => {
-    const order = comparator(a[1], b[1]);
-    if (order !== 0) return order;
-    return a[2] - b[2];
-  });
+  if (findHeader?.sortable === undefined || findHeader?.sortable === false) {
+    stabilizedThis.sort((a, b) => {
+      const order = comparator(a[1], b[1]);
+      if (order !== 0) return order;
+      return a[2] - b[2];
+    });
+  }
   return stabilizedThis.map((el) => el[0]);
 }
-

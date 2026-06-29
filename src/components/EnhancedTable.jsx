@@ -21,20 +21,39 @@ import DataRow from "./DataRow";
 import TableLoader from "./TableLoader";
 
 function EnhancedTable(props) {
-  const { headers, rows, subTable, selected, selectID } = props;
-  const dense = true;
   const {
+    headers,
+    rows,
+    subTable,
+    selected,
+    selectID,
+    setLoading,
+    searchTerm,
+    setOrder,
+    setOrderBy,
     order,
     orderBy,
+    async,
+    asyncPages,
+  } = props;
+  const dense = true;
+  const {
     page,
     rowsPerPage,
-    handleRequestSort,
+    handleSort,
     handleChangePage,
     handleChangeRowsPerPage,
   } = useEnhancedTableState({
     rows,
     subTable,
     resetFlag: props.resetFlag,
+    apiCall: setLoading,
+    searchTerm,
+    setOrder,
+    setOrderBy,
+    order,
+    orderBy,
+    asyncPages,
   });
 
   const emptyRows = Math.max(
@@ -47,14 +66,14 @@ function EnhancedTable(props) {
     [selected],
   );
 
-  const visibleRows = React.useMemo(
-    () =>
-      stableSort(rows, getComparator(order, orderBy), headers).slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage,
-      ),
-    [headers, order, orderBy, page, rows, rowsPerPage],
-  );
+  const visibleRows = React.useMemo(() => {
+    return stableSort(
+      rows,
+      getComparator(order, orderBy),
+      headers,
+      orderBy,
+    ).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [headers, order, orderBy, page, rows, rowsPerPage]);
 
   return (
     <TableContainer>
@@ -70,12 +89,13 @@ function EnhancedTable(props) {
             <EnhancedTableHead
               order={order}
               orderBy={orderBy}
-              onRequestSort={handleRequestSort}
+              onRequestSort={handleSort}
               headings={headers}
               selectRows={props.selectRows}
               numSelected={selected.length}
               rowCount={rows.length}
               onSelectAllClick={props.handleSelectAllClick}
+              async={async}
             />
 
             <TableBody>
@@ -111,7 +131,9 @@ function EnhancedTable(props) {
         <Box sx={{ mb: 3 }} />
       ) : (
         <TablePagination
-          rowsPerPageOptions={props.pageSizeOptions || getPageOptions(rows.length)}
+          rowsPerPageOptions={
+            props.pageSizeOptions || getPageOptions(rows.length)
+          }
           component="div"
           count={rows.length}
           rowsPerPage={rowsPerPage}
@@ -138,9 +160,17 @@ EnhancedTable.propTypes = {
   handleClick: PropTypes.func,
   selected: PropTypes.array,
   selectID: PropTypes.string,
+  async: PropTypes.bool,
   resetFlag: PropTypes.string,
   pageSizeOptions: PropTypes.arrayOf(PropTypes.number),
   name: PropTypes.string,
+  setLoading: PropTypes.func,
+  searchTerm: PropTypes.string,
+  setOrder: PropTypes.func,
+  setOrderBy: PropTypes.func,
+  order: PropTypes.string,
+  orderBy: PropTypes.string,
+  asyncPages: PropTypes.number,
 };
 
 export default EnhancedTable;

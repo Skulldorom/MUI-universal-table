@@ -11,13 +11,12 @@ import { Clear, Search } from "@mui/icons-material";
 import PropTypes from "prop-types";
 
 export default function FancySearch({ value, onSubmit }) {
-  const [search, setSearch] = React.useState(value);
-  const [hover, setHover] = React.useState(Boolean(search));
-  const expanded = hover || Boolean(search);
+  const [hover, setHover] = React.useState(Boolean(value));
+  const expanded = hover || Boolean(value);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(search);
+    onSubmit(value);
   };
 
   const handleEndHover = () => {
@@ -28,21 +27,6 @@ export default function FancySearch({ value, onSubmit }) {
   // A ref tracks whether this sync came from the user typing or from a parent
   // update, so the debounce only fires for genuine user input.
   const isUserType = React.useRef(false);
-
-  React.useEffect(() => {
-    if (isUserType.current) {
-      // User is typing — debounce as normal
-      isUserType.current = false;
-      const timer = setTimeout(() => {
-        onSubmit(search);
-      }, 700);
-      return () => clearTimeout(timer);
-    }
-    // External value change (parent reset, clear from clearSelection, etc.)
-    // — sync state and do NOT fire a stale debounce.
-    setSearch(value);
-    return undefined;
-  }, [search, value, onSubmit]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -64,10 +48,10 @@ export default function FancySearch({ value, onSubmit }) {
       >
         <InputBase
           placeholder="Search"
-          value={search}
+          value={value}
           onChange={(e) => {
             isUserType.current = true;
-            setSearch(e.target.value);
+            onSubmit(e.target.value);
           }}
           sx={{
             ml: 1,
@@ -78,21 +62,11 @@ export default function FancySearch({ value, onSubmit }) {
           onBlur={handleEndHover}
         />
 
-        <Collapse
-          in={Boolean(search)}
-          orientation="horizontal"
-          unmountOnExit
-        >
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={0}
-            sx={{ mr: 3 }}
-          >
+        <Collapse in={Boolean(value)} orientation="horizontal" unmountOnExit>
+          <Stack direction="row" alignItems="center" spacing={0} sx={{ mr: 3 }}>
             <IconButton
               onClick={() => {
                 isUserType.current = false;
-                setSearch("");
                 // Immediately clear instead of waiting for the debounce
                 onSubmit("");
               }}
