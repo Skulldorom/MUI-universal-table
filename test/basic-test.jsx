@@ -1,6 +1,6 @@
 import React from "react";
 import { jest } from "@jest/globals";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UniversalTable } from "../src/index.js";
 
@@ -33,6 +33,16 @@ const selectableData = [
   { id: 1, name: "Alpha" },
   { id: 2, name: "Beta" },
   { id: 3, name: "Gamma" },
+];
+
+const asyncHeaders = [
+  { id: "name", label: "Name", searchable: true, sortable: true },
+  { id: "email", label: "Email", searchable: true },
+];
+
+const asyncData = [
+  { name: "John Doe", email: "john@example.com" },
+  { name: "Jane Smith", email: "jane@example.com" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -271,6 +281,94 @@ test("calls onReload when reload button is clicked", async () => {
   const reloadBtn = screen.getByRole("button", { name: /reload/i });
   await user.click(reloadBtn);
   expect(onReload).toHaveBeenCalledTimes(1);
+});
+
+test("async mode search triggers setLoading with payload after debounce", () => {
+  jest.useFakeTimers();
+  const setLoading = jest.fn();
+
+  try {
+    render(
+      <UniversalTable
+        data={asyncData}
+        headers={asyncHeaders}
+        name="AsyncSearch"
+        loading={false}
+        setLoading={setLoading}
+        asyncPages={2}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText("Search");
+    fireEvent.change(searchInput, { target: { value: "Jane" } });
+
+    // Async mode keeps current rows until new data is fetched.
+    expect(screen.getByText("John Doe")).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(setLoading).toHaveBeenCalledWith({
+      searchTerm: "Jane",
+      direction: "asc",
+      column: "",
+      pages: 2,
+    });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("async sortable column click triggers setLoading sort payload", async () => {
+  const user = userEvent.setup();
+  const setLoading = jest.fn();
+
+  render(
+    <UniversalTable
+      data={asyncData}
+      headers={asyncHeaders}
+      name="AsyncSort"
+      loading={false}
+      setLoading={setLoading}
+      asyncPages={3}
+    />,
+  );
+
+  await user.click(screen.getByText("Name"));
+
+  expect(setLoading).toHaveBeenCalledWith({
+    searchTerm: "",
+    column: "name",
+    direction: "desc",
+    pages: 3,
+  });
+});
+
+test("async mode reload calls setLoading with current async payload", async () => {
+  const user = userEvent.setup();
+  const setLoading = jest.fn();
+
+  render(
+    <UniversalTable
+      data={asyncData}
+      headers={asyncHeaders}
+      name="AsyncReload"
+      loading={false}
+      setLoading={setLoading}
+      asyncPages={4}
+    />,
+  );
+
+  const reloadBtn = screen.getByRole("button", { name: /reload/i });
+  await user.click(reloadBtn);
+
+  expect(setLoading).toHaveBeenCalledWith({
+    searchTerm: "",
+    direction: "asc",
+    column: "",
+    pages: 4,
+  });
 });
 
 // ---------------------------------------------------------------------------

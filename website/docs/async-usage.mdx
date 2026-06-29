@@ -1,0 +1,86 @@
+---
+sidebar_position: 3
+---
+
+# Async / Server-side Usage
+
+Use async mode when your API handles searching and sorting.
+
+## 1) Enable async mode
+
+Set `asyncPages` to a positive number and pass a `setLoading` callback.
+
+```jsx
+<UniversalTable
+  data={rows}
+  headers={headers}
+  name="Users"
+  loading={loading}
+  setLoading={fetchUsers}
+  asyncPages={1}
+/>
+```
+
+When async mode is enabled, the table sends a payload object to `setLoading`:
+
+```ts
+{
+  searchTerm: string;
+  column: string;
+  direction: "asc" | "desc";
+  pages: number;
+}
+```
+
+## 2) Handle search, sort, and reload
+
+The table calls `setLoading` with the same payload shape for:
+
+- Search (debounced by 500ms)
+- Sort (when clicking sortable headers)
+- Reload (when using the reload button)
+
+```jsx
+const fetchUsers = async ({
+  searchTerm = "",
+  column = "",
+  direction = "asc",
+  pages = 1,
+} = {}) => {
+  setLoading(true);
+  try {
+    const result = await api.getUsers({ searchTerm, column, direction, pages });
+    setRows(result.rows);
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+## 3) Mark server-sortable columns
+
+In async mode, only headers with `sortable: true` trigger API sorting.
+Other columns continue to sort client-side.
+
+```jsx
+const headers = [
+  { id: "name", label: "Name", searchable: true, sortable: true },
+  { id: "email", label: "Email", searchable: true },
+];
+```
+
+## 4) Optional: custom reload behavior
+
+If you provide `onReload`, it is used instead of `setLoading` for reload clicks.
+
+```jsx
+<UniversalTable
+  data={rows}
+  headers={headers}
+  name="Users"
+  loading={loading}
+  setLoading={fetchUsers}
+  onReload={() => fetchUsers({ searchTerm: currentSearch, column: "name", direction: "asc", pages: 1 })}
+  asyncPages={1}
+/>
+```
