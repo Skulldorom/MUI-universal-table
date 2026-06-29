@@ -3,8 +3,8 @@ import PropTypes from "prop-types";
 import { Button, Tooltip } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-function ReloadBtn({ setLoading, loading, onReload }) {
-  const canReload = typeof onReload === "function" || typeof setLoading === "function";
+function ReloadBtn({ loading, onReload }) {
+  const canReload = typeof onReload === "function";
 
   if (!canReload) {
     return null;
@@ -13,8 +13,6 @@ function ReloadBtn({ setLoading, loading, onReload }) {
   const handleClick = () => {
     if (typeof onReload === "function") {
       onReload();
-    } else if (typeof setLoading === "function") {
-      setLoading(true);
     }
   };
 
@@ -33,7 +31,6 @@ function ReloadBtn({ setLoading, loading, onReload }) {
 }
 
 ReloadBtn.propTypes = {
-  setLoading: PropTypes.func,
   loading: PropTypes.bool,
   /** Preferred callback — fires when the user clicks reload. */
   onReload: PropTypes.func,

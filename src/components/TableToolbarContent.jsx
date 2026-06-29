@@ -5,7 +5,6 @@ import ReloadBtn from "./ReloadBtn";
 import SearchArea from "./SearchArea";
 
 function TableToolbarContent({
-  setLoading,
   onReload,
   reloadBtnLoading,
   searchTerm,
@@ -30,7 +29,7 @@ function TableToolbarContent({
         }}
       >
         <Box sx={{ flex: "1 1 100%" }} id="tableTitle">
-          <ReloadBtn setLoading={setLoading} onReload={onReload} loading={reloadBtnLoading} />
+          <ReloadBtn onReload={onReload} loading={reloadBtnLoading} />
         </Box>
         <SearchArea
           current={searchTerm}
@@ -44,7 +43,6 @@ function TableToolbarContent({
 }
 
 TableToolbarContent.propTypes = {
-  setLoading: PropTypes.func,
   onReload: PropTypes.func,
   reloadBtnLoading: PropTypes.bool,
   searchTerm: PropTypes.string,

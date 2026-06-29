@@ -112,8 +112,11 @@ export default function UniversalTable({
         <TableTitle name={name} subTable={subTable} />
         {!subTable && (
           <TableToolbarContent
-            setLoading={setLoading}
-            onReload={handleReload}
+            onReload={
+              typeof onReload === "function" || typeof setLoading === "function"
+                ? handleReload
+                : undefined
+            }
             reloadBtnLoading={reloadBtnLoading}
             searchTerm={searchTerm}
             onSearchChange={handleSearch}
