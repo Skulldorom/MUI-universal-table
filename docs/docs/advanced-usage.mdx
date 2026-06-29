@@ -1,0 +1,55 @@
+---
+sidebar_position: 3
+---
+
+# Advanced Usage
+
+## With row selection
+
+```jsx
+<UniversalTable
+  data={data}
+  headers={headers}
+  name="Selectable Users"
+  selectRows={true}
+  selectID="id"
+  onSelection={(selectedIds) => {
+    console.log("Selected:", selectedIds);
+  }}
+/>
+```
+
+## With custom cell rendering
+
+```jsx
+const headers = [
+  { id: "name", label: "Name", searchable: true },
+  {
+    id: "status",
+    label: "Status",
+    component: (row) => (
+      <Chip
+        label={row.status}
+        color={row.status === "active" ? "success" : "default"}
+      />
+    ),
+  },
+];
+```
+
+## With sub-tables
+
+```jsx
+const headers = [
+  { id: "name", label: "Department", searchable: true },
+  {
+    id: "employees",
+    label: "Employees",
+    subRow: true,
+    headers: [
+      { id: "name", label: "Employee Name", searchable: true },
+      { id: "role", label: "Role" },
+    ],
+  },
+];
+```

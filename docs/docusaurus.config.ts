@@ -25,7 +25,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl:
-            'https://github.com/Skulldorom/MUI-universal-table/tree/main/website/',
+            'https://github.com/Skulldorom/MUI-universal-table/tree/main/docs/',
         },
         blog: false,
         theme: {

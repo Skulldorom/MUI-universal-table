@@ -103,163 +103,12 @@ Each header object can have the following properties:
 | `openIcon`   | `element` | Custom icon for expanding                                                                                                                                                               |
 | `closeIcon`  | `element` | Custom icon for collapsing                                                                                                                                                              |
 
-## Advanced Examples
+## Advanced Usage
 
-### With Row Selection
+Advanced usage examples (row selection, custom cells, and sub-tables) plus async/server-side guidance have moved to the docs site:
 
-```jsx
-<UniversalTable
-  data={data}
-  headers={headers}
-  name="Selectable Users"
-  selectRows={true}
-  selectID="id"
-  onSelection={(selectedIds) => {
-    console.log("Selected:", selectedIds);
-  }}
-/>
-```
-
-### With Custom Cell Rendering
-
-```jsx
-const headers = [
-  { id: "name", label: "Name", searchable: true },
-  {
-    id: "status",
-    label: "Status",
-    component: (row) => (
-      <Chip
-        label={row.status}
-        color={row.status === "active" ? "success" : "default"}
-      />
-    ),
-  },
-];
-```
-
-### With Sub-tables
-
-```jsx
-const headers = [
-  { id: "name", label: "Department", searchable: true },
-  {
-    id: "employees",
-    label: "Employees",
-    subRow: true,
-    headers: [
-      { id: "name", label: "Employee Name", searchable: true },
-      { id: "role", label: "Role" },
-    ],
-  },
-];
-```
-
-````
-
-The callback receives `{ searchTerm, direction, column, pages }`.
-
-## Async / Server-side Mode
-
-Set `asyncPages` to a positive number to enable server-side search and sort. Instead of filtering the data in-browser, the table calls `setLoading` with a payload object so your API handler can fetch the correct page.
-
-### Payload shape
-
-Every `setLoading` call in async mode passes the same object:
-
-```ts
-{
-  searchTerm: string,   // current search input
-  column: string,       // column id being sorted (empty string if none)
-  direction: "asc" | "desc",
-  pages: number,        // value of the asyncPages prop
-}
-````
-
-This payload is sent on:
-
-- **Search** — debounced 500 ms after the user stops typing
-- **Sort** — immediately when the user clicks a sortable column header
-- **Reload** — when the user clicks the reload button (using the current search/sort state)
-
-### Example
-
-```jsx
-function ServerSideTable() {
-  const [loading, setLoading] = React.useState(false);
-  const [data, setData] = React.useState([]);
-
-  const fetchData = async ({
-    searchTerm = "",
-    column = "",
-    direction = "asc",
-    pages = 1,
-  } = {}) => {
-    setLoading(true);
-    try {
-      const result = await myApi.getUsers({
-        searchTerm,
-        column,
-        direction,
-        pages,
-      });
-      setData(result);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchData();
-  }, []);
-
-  return (
-    <UniversalTable
-      data={data}
-      headers={headers}
-      name="Users"
-      loading={loading}
-      setLoading={fetchData}
-      asyncPages={1}
-    />
-  );
-}
-```
-
-> **Note:** When `asyncPages` is set, client-side search is disabled — the table renders whatever is in `data` as-is. For sorting, behaviour depends on the `sortable` flag on each header column (see below).
-
-### Column-level sort behaviour in async mode
-
-In async mode, each column independently controls whether sorting is handled by the server or the client:
-
-| Header has `sortable: true` | Clicking the column header                                           |
-| --------------------------- | -------------------------------------------------------------------- |
-| Yes                         | Calls `setLoading` with the sort payload — your API handles the sort |
-| No (default)                | Sorts the currently loaded `data` client-side                        |
-
-This lets you mix server-sorted and client-sorted columns in the same table — for example, server-sort on a large indexed column while still allowing client-side sort on a small computed field.
-
-```jsx
-const headers = [
-  { id: "name", label: "Name", searchable: true, sortable: true }, // → API
-  { id: "status", label: "Status", sortable: true }, // → API
-  { id: "localScore", label: "Score", numeric: true }, // → client-side
-];
-```
-
-### Reload button
-
-For the reload button, prefer providing an `onReload` callback. It takes priority over `setLoading` and gives you explicit control:
-
-```jsx
-<UniversalTable
-  ...
-  onReload={() => fetchData({ searchTerm: currentSearch, column, direction, pages: 1 })}
-  reloadBtnLoading={loading}
-/>
-```
-
-If you only provide `setLoading`, the reload button will call it with the current search/sort state automatically.
+- https://skulldorom.github.io/MUI-universal-table/docs/advanced-usage
+- https://skulldorom.github.io/MUI-universal-table/docs/async-usage
 
 ## License
 
@@ -267,7 +116,7 @@ MIT
 
 ## Documentation Site (Docusaurus)
 
-This repository includes a Docusaurus site in `/website`.
+This repository includes a Docusaurus site in `/docs`.
 
 Run it locally:
 
