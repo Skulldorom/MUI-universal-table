@@ -88,19 +88,20 @@ function MyTable() {
 
 Each header object can have the following properties:
 
-| Property     | Type      | Description                                              |
-| ------------ | --------- | -------------------------------------------------------- |
-| `id`         | `string`  | **Required** - Column identifier (matches data property) |
-| `label`      | `string`  | **Required** - Display label for column                  |
-| `searchable` | `bool`    | Whether this column is searchable                        |
-| `numeric`    | `bool`    | Right-align column for numeric data                      |
-| `date`       | `bool`    | Format as date/time                                      |
-| `component`  | `func`    | Custom render function `(rowData) => ReactElement`       |
-| `cellProps`  | `object`  | Additional props for table cells                         |
-| `subRow`     | `bool`    | Column contains expandable sub-table data                |
-| `iconColor`  | `string`  | Color for expand/collapse icons                          |
-| `openIcon`   | `element` | Custom icon for expanding                                |
-| `closeIcon`  | `element` | Custom icon for collapsing                               |
+| Property     | Type      | Description                                                                                                                                                                             |
+| ------------ | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | `string`  | **Required** - Column identifier (matches data property)                                                                                                                                |
+| `label`      | `string`  | **Required** - Display label for column                                                                                                                                                 |
+| `searchable` | `bool`    | Whether this column is searchable                                                                                                                                                       |
+| `numeric`    | `bool`    | Right-align column for numeric data                                                                                                                                                     |
+| `date`       | `bool`    | Format as date/time                                                                                                                                                                     |
+| `sortable`   | `bool`    | In async mode, marks this column as server-sortable — clicking the header calls `setLoading` with a payload instead of sorting client-side. Has no effect when `asyncPages` is not set. |
+| `component`  | `func`    | Custom render function `(rowData) => ReactElement`                                                                                                                                      |
+| `cellProps`  | `object`  | Additional props for table cells                                                                                                                                                        |
+| `subRow`     | `bool`    | Column contains expandable sub-table data                                                                                                                                               |
+| `iconColor`  | `string`  | Color for expand/collapse icons                                                                                                                                                         |
+| `openIcon`   | `element` | Custom icon for expanding                                                                                                                                                               |
+| `closeIcon`  | `element` | Custom icon for collapsing                                                                                                                                                              |
 
 ## Advanced Examples
 
@@ -225,7 +226,26 @@ function ServerSideTable() {
 }
 ```
 
-> **Note:** When `asyncPages` is set, client-side search and sort are disabled — the table renders whatever is in `data` as-is and delegates filtering/sorting to your API.
+> **Note:** When `asyncPages` is set, client-side search is disabled — the table renders whatever is in `data` as-is. For sorting, behaviour depends on the `sortable` flag on each header column (see below).
+
+### Column-level sort behaviour in async mode
+
+In async mode, each column independently controls whether sorting is handled by the server or the client:
+
+| Header has `sortable: true` | Clicking the column header                                           |
+| --------------------------- | -------------------------------------------------------------------- |
+| Yes                         | Calls `setLoading` with the sort payload — your API handles the sort |
+| No (default)                | Sorts the currently loaded `data` client-side                        |
+
+This lets you mix server-sorted and client-sorted columns in the same table — for example, server-sort on a large indexed column while still allowing client-side sort on a small computed field.
+
+```jsx
+const headers = [
+  { id: "name", label: "Name", searchable: true, sortable: true }, // → API
+  { id: "status", label: "Status", sortable: true }, // → API
+  { id: "localScore", label: "Score", numeric: true }, // → client-side
+];
+```
 
 ### Reload button
 
