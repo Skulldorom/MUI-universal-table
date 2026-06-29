@@ -1,6 +1,6 @@
 {
   "name": "mui-universal-table",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A universal table component built with Material UI for React applications",
   "keywords": [
     "react",
@@ -34,6 +34,9 @@
     "pack:local": "npm run build && npm pack",
     "dev": "rollup -c -w",
     "prepack": "npm run build",
+    "docs:start": "npm --prefix website run start",
+    "docs:build": "npm --prefix website run build",
+    "docs:serve": "npm --prefix website run serve",
     "test": "node --experimental-vm-modules node_modules/jest-cli/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest-cli/bin/jest.js --watch",
     "lint": "eslint src",

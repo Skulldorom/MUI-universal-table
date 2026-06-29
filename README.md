@@ -245,6 +245,22 @@ If you only provide `setLoading`, the reload button will call it with the curren
 
 MIT
 
+## Documentation Site (Docusaurus)
+
+This repository includes a Docusaurus site in `/website`.
+
+Run it locally:
+
+```bash
+npm run docs:start
+```
+
+Build static docs:
+
+```bash
+npm run docs:build
+```
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.

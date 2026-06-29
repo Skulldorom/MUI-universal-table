@@ -1,0 +1,41 @@
+---
+sidebar_position: 3
+---
+
+# Props Reference
+
+## UniversalTable props
+
+| Prop               | Type      | Default      | Description                                        |
+| ------------------ | --------- | ------------ | -------------------------------------------------- |
+| `data`             | `array`   | **required** | Array of data objects to display                   |
+| `headers`          | `array`   | **required** | Array of header configuration objects              |
+| `name`             | `string`  | -            | Table title                                        |
+| `loading`          | `bool`    | `false`      | Shows loading state                                |
+| `setLoading`       | `func`    | -            | Function to control loading state                  |
+| `selectRows`       | `bool`    | `false`      | Enable row selection                               |
+| `selectID`         | `string`  | -            | Property to use as unique identifier for selection |
+| `onSelection`      | `func`    | -            | Callback when rows are selected                    |
+| `subTable`         | `bool`    | `false`      | Whether this is a nested sub-table                 |
+| `hideBadge`        | `bool`    | `false`      | Hide badges on expandable rows                     |
+| `reloadBtnLoading` | `bool`    | `false`      | Loading state for reload button                    |
+| `lazyloading`      | `bool`    | `false`      | Enable lazy loading indicator                      |
+| `currentPage`      | `number`  | -            | Current page for lazy loading                      |
+| `totalPages`       | `number`  | -            | Total pages for lazy loading                       |
+| `selectIcon`       | `element` | -            | Custom icon for selection action                   |
+
+## Header object fields
+
+| Property     | Type      | Description                                              |
+| ------------ | --------- | -------------------------------------------------------- |
+| `id`         | `string`  | **Required** - Column identifier (matches data property) |
+| `label`      | `string`  | **Required** - Display label for column                  |
+| `searchable` | `bool`    | Whether this column is searchable                        |
+| `numeric`    | `bool`    | Right-align column for numeric data                      |
+| `date`       | `bool`    | Format as date/time                                      |
+| `component`  | `func`    | Custom render function `(rowData) => ReactElement`       |
+| `cellProps`  | `object`  | Additional props for table cells                         |
+| `subRow`     | `bool`    | Column contains expandable sub-table data                |
+| `iconColor`  | `string`  | Color for expand/collapse icons                          |
+| `openIcon`   | `element` | Custom icon for expanding                                |
+| `closeIcon`  | `element` | Custom icon for collapsing                               |
