@@ -78,6 +78,17 @@ export default function UniversalTable({
     return () => clearTimeout(debounceRef.current);
   }, []);
 
+  React.useEffect(() => {
+    if (async) {
+      setLoading({
+        searchTerm,
+        direction: order,
+        column: orderBy,
+        pages: asyncPages,
+      });
+    }
+  }, []);
+
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {
       onReload();
