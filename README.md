@@ -2,6 +2,7 @@
 
 [![Tests](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/tests.yml/badge.svg)](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/tests.yml)
 [![Release](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/npm-publish.yml)
+[![GitHub release](https://img.shields.io/github/v/release/Skulldorom/MUI-universal-table)](https://github.com/Skulldorom/MUI-universal-table/releases)
 
 A comprehensive, feature-rich table component built with Material-UI for React applications.
 
