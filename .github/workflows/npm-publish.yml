@@ -37,7 +37,7 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Use a PAT or the default token; fetch full history for tagging
           token: ${{ secrets.GITHUB_TOKEN }}
