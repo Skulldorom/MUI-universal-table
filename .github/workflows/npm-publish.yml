@@ -1,5 +1,5 @@
-# This workflow auto-increments the version and publishes on every push to main (patch bump).
-# When triggered manually via workflow_dispatch, you can choose patch, minor, or major.
+# Auto-increments the version and publishes after the required test workflow passes.
+# Push events default to a patch bump. Manual dispatch can choose patch, minor, or major.
 
 name: Node.js Package
 
@@ -20,10 +20,17 @@ on:
           - major
 
 jobs:
+  quality-gates:
+    name: Required tests
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+
   build-and-publish:
     # Skip push events triggered by the version-bump commit to avoid an infinite loop.
     # workflow_dispatch events are always allowed through.
     if: "github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'chore: bump version')"
+    needs: quality-gates
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -42,15 +49,18 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org/
+          cache: npm
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
 
       - name: Verify build output
-        run: test -f dist/index.js || (echo "Build failed - dist/index.js not found" && exit 1)
+        run: test -f dist/index.cjs || (echo "Build failed - dist/index.cjs not found" && exit 1)
 
       - name: Configure Git
         run: |
