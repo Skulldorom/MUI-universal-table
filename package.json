@@ -59,7 +59,7 @@
     "@babel/preset-react": "^7.29.7",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.5",
     "@mui/icons-material": "^9.2.0",
     "@mui/material": "^9.2.0",
     "@rollup/plugin-babel": "^7.1.0",
@@ -73,9 +73,11 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "baseline-browser-mapping": "^2.11.0",
-    "eslint": "^10.7.0",
+    "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.7.0",
     "identity-obj-proxy": "^3.0.0",
@@ -86,8 +88,7 @@
     "react-dom": "^19.2.8",
     "rollup": "^4.62.2",
     "rollup-plugin-peer-deps-external": "^2.2.4",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "@typescript/native": "npm:typescript@^7.0.2"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "repository": {
     "type": "git",

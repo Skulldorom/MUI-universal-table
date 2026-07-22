@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
@@ -24,11 +25,14 @@ export default [
       },
     },
     plugins: {
+      react,
       "react-hooks": reactHooks,
       "@typescript-eslint": tseslint,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      "react/jsx-uses-vars": "error",
+      "react/jsx-uses-react": "error",
       "no-console": "warn",
       "no-unused-vars": "warn",
       "react-hooks/exhaustive-deps": "warn",
