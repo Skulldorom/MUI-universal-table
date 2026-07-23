@@ -46,6 +46,7 @@ function EnhancedTable(props) {
   } = useEnhancedTableState({
     rows,
     subTable,
+    pageSizeOptions: props.pageSizeOptions,
     resetFlag: props.resetFlag,
     apiCall: setLoading,
     searchTerm,

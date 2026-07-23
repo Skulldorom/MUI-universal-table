@@ -123,7 +123,9 @@ test("filters rows by search term", async () => {
   expect(searchInput).toBeInTheDocument();
 
   await user.type(searchInput, "Jane");
-  await new Promise((r) => setTimeout(r, 800));
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 800));
+  });
 
   expect(screen.getByText("Jane Smith")).toBeInTheDocument();
   expect(screen.queryByText("John Doe")).not.toBeInTheDocument();
@@ -137,7 +139,9 @@ test("clears search and shows all rows again", async () => {
 
   const searchInput = screen.getByPlaceholderText("Search");
   await user.type(searchInput, "Bob");
-  await new Promise((r) => setTimeout(r, 800));
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 800));
+  });
   expect(screen.queryByText("John Doe")).not.toBeInTheDocument();
 
   // Clear via the X button
@@ -179,7 +183,7 @@ test("select all checkbox selects all visible rows", async () => {
 // Sorting
 // ---------------------------------------------------------------------------
 
-test("clicking a column header toggles sort direction", async () => {
+test("clicking a column header sorts rows by that column", async () => {
   const user = userEvent.setup();
   render(
     <UniversalTable
@@ -190,10 +194,16 @@ test("clicking a column header toggles sort direction", async () => {
     />,
   );
 
-  const nameHeader = screen.getByText("Name");
-  // No default sort — clicking the Name column sets it to asc
+  const visibleBodyRowsBeforeSort = within(screen.getAllByRole("rowgroup")[1]).getAllByRole("row");
+  expect(within(visibleBodyRowsBeforeSort[0]).getByText("C")).toBeInTheDocument();
+
+  const nameHeader = screen.getByRole("button", { name: /name/i });
   await user.click(nameHeader);
-  // Just verify no crash — the click should work
+
+  const visibleBodyRowsAfterSort = within(screen.getAllByRole("rowgroup")[1]).getAllByRole("row");
+  expect(within(visibleBodyRowsAfterSort[0]).getByText("A")).toBeInTheDocument();
+  expect(within(visibleBodyRowsAfterSort[1]).getByText("B")).toBeInTheDocument();
+  expect(within(visibleBodyRowsAfterSort[2]).getByText("C")).toBeInTheDocument();
 });
 
 // ---------------------------------------------------------------------------
@@ -245,7 +255,7 @@ test("changes rows per page", async () => {
 // Custom page size options
 // ---------------------------------------------------------------------------
 
-test("accepts custom pageSizeOptions", () => {
+test("accepts custom pageSizeOptions without out-of-range pagination warnings", () => {
   render(
     <UniversalTable
       data={data}
@@ -258,6 +268,7 @@ test("accepts custom pageSizeOptions", () => {
 
   const rowsPerPageSelect = screen.getByRole("combobox");
   expect(rowsPerPageSelect).toBeInTheDocument();
+  expect(screen.getByText(/1–6 of 6/i)).toBeInTheDocument();
 });
 
 // ---------------------------------------------------------------------------

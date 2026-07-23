@@ -63,7 +63,7 @@ export default function FancySearch({ value, onSubmit }) {
         />
 
         <Collapse in={Boolean(value)} orientation="horizontal" unmountOnExit>
-          <Stack direction="row" alignItems="center" spacing={0} sx={{ mr: 3 }}>
+          <Stack direction="row" spacing={0} sx={{ mr: 3, alignItems: "center" }}>
             <IconButton
               onClick={() => {
                 isUserType.current = false;
