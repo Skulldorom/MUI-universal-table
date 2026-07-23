@@ -1,8 +1,17 @@
 import React from "react";
 
+function getInitialRowsPerPage({ rows, subTable, pageSizeOptions }) {
+  if (subTable) return rows.length;
+  if (Array.isArray(pageSizeOptions) && pageSizeOptions.length > 0) {
+    return pageSizeOptions[0];
+  }
+  return 5;
+}
+
 export default function useEnhancedTableState({
   rows,
   subTable,
+  pageSizeOptions,
   resetFlag,
   apiCall,
   searchTerm,
@@ -14,7 +23,7 @@ export default function useEnhancedTableState({
 }) {
   const [pagination, setPagination] = React.useState(() => ({
     page: 0,
-    rowsPerPage: subTable ? rows.length : 5,
+    rowsPerPage: getInitialRowsPerPage({ rows, subTable, pageSizeOptions }),
     resetFlag,
   }));
 

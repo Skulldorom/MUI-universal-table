@@ -42,7 +42,8 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "test:unit": "npm test -- --runInBand",
-    "test:smoke": "npm run build && node test/smoke-test.mjs"
+    "test:smoke": "npm run build && node test/smoke-test.mjs",
+    "test:types": "tsc --noEmit --project tsconfig.test.json"
   },
   "peerDependencies": {
     "@emotion/react": "^11.5.0",

@@ -87,6 +87,9 @@ export default function UniversalTable({
         pages: asyncPages,
       });
     }
+    // Run the initial async load once on mount; search/sort/reload handlers
+    // send their own payloads after user interaction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleReload = React.useCallback(() => {

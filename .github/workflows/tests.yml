@@ -39,6 +39,9 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+      - name: Run TypeScript consumer tests
+        run: npm run test:types
+
   smoke-tests:
     name: Smoke tests
     runs-on: ubuntu-latest

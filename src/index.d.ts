@@ -1,7 +1,15 @@
-import { ReactElement } from "react";
+/* eslint-disable no-unused-vars */
+import { FC, ReactElement } from "react";
 
 export interface TableRowData {
   [key: string]: unknown;
+}
+
+export interface AsyncLoadingPayload {
+  searchTerm: string;
+  direction: "asc" | "desc";
+  column: string;
+  pages: number;
 }
 
 export interface TableHeader {
@@ -10,7 +18,7 @@ export interface TableHeader {
   searchable?: boolean;
   numeric?: boolean;
   date?: boolean;
-  // eslint-disable-next-line no-unused-vars
+  sortable?: boolean;
   component?: (rowData: TableRowData) => ReactElement;
   cellProps?: Record<string, unknown>;
   subRow?: boolean;
@@ -19,15 +27,13 @@ export interface TableHeader {
   closeIcon?: ReactElement;
   headers?: TableHeader[];
   loading?: boolean;
-  // eslint-disable-next-line no-unused-vars
   setLoading?: (loading: boolean) => void;
   /** Preferred callback — fires when the user clicks reload on a sub-table. */
-  // eslint-disable-next-line no-unused-vars
   onReload?: () => void;
   subTitle?: string;
 }
 
-export interface UniversalTableProps {
+interface UniversalTableCommonProps {
   /** Array of data objects to display */
   data: TableRowData[];
   /** Array of header configuration objects */
@@ -36,11 +42,7 @@ export interface UniversalTableProps {
   name?: string;
   /** Shows loading state */
   loading?: boolean;
-  /** Function to control loading state (legacy — prefer onReload) */
-  // eslint-disable-next-line no-unused-vars
-  setLoading?: (loading: boolean) => void;
   /** Fires when the user clicks the reload button */
-  // eslint-disable-next-line no-unused-vars
   onReload?: () => void;
   /** Enable lazy loading indicator */
   lazyloading?: boolean;
@@ -61,7 +63,6 @@ export interface UniversalTableProps {
   /** Custom icon for selection action */
   selectIcon?: ReactElement;
   /** Callback when rows are selected */
-  // eslint-disable-next-line no-unused-vars
   onSelection?: (selectedIds: unknown[]) => void;
   /** Override default page size options (e.g. [10, 25, 50]) */
   pageSizeOptions?: number[];
@@ -69,7 +70,22 @@ export interface UniversalTableProps {
   persistSearch?: boolean;
 }
 
-declare const UniversalTable: React.FC<UniversalTableProps>;
+export interface UniversalTableSyncProps extends UniversalTableCommonProps {
+  /** Function to control loading state in synchronous mode (legacy — prefer onReload) */
+  setLoading?: (loading: boolean) => void;
+  asyncPages?: undefined;
+}
+
+export interface UniversalTableAsyncProps extends UniversalTableCommonProps {
+  /** Function to request async search/sort/reload data */
+  setLoading: (loading: AsyncLoadingPayload) => void;
+  /** Enables async search/sort payload mode and supplies total async pages */
+  asyncPages: number;
+}
+
+export type UniversalTableProps = UniversalTableSyncProps | UniversalTableAsyncProps;
+
+declare const UniversalTable: FC<UniversalTableProps>;
 
 export { UniversalTable };
 export default UniversalTable;

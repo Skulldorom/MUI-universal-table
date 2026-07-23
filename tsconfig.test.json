@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["react", "react-dom"],
+    "skipLibCheck": true
+  },
+  "include": ["src/index.d.ts", "test/types/**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}
