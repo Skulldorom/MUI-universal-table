@@ -33,7 +33,7 @@ export interface TableHeader {
   subTitle?: string;
 }
 
-export interface UniversalTableProps {
+interface UniversalTableCommonProps {
   /** Array of data objects to display */
   data: TableRowData[];
   /** Array of header configuration objects */
@@ -42,8 +42,6 @@ export interface UniversalTableProps {
   name?: string;
   /** Shows loading state */
   loading?: boolean;
-  /** Function to control loading state (legacy — prefer onReload) */
-  setLoading?: (loading: boolean | AsyncLoadingPayload) => void;
   /** Fires when the user clicks the reload button */
   onReload?: () => void;
   /** Enable lazy loading indicator */
@@ -70,9 +68,22 @@ export interface UniversalTableProps {
   pageSizeOptions?: number[];
   /** Persist search term to sessionStorage (requires name prop) */
   persistSearch?: boolean;
-  /** Enables async search/sort payload mode and supplies total async pages */
-  asyncPages?: number;
 }
+
+export interface UniversalTableSyncProps extends UniversalTableCommonProps {
+  /** Function to control loading state in synchronous mode (legacy — prefer onReload) */
+  setLoading?: (loading: boolean) => void;
+  asyncPages?: undefined;
+}
+
+export interface UniversalTableAsyncProps extends UniversalTableCommonProps {
+  /** Function to request async search/sort/reload data */
+  setLoading: (loading: AsyncLoadingPayload) => void;
+  /** Enables async search/sort payload mode and supplies total async pages */
+  asyncPages: number;
+}
+
+export type UniversalTableProps = UniversalTableSyncProps | UniversalTableAsyncProps;
 
 declare const UniversalTable: FC<UniversalTableProps>;
 

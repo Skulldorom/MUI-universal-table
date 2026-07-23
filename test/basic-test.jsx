@@ -271,6 +271,22 @@ test("accepts custom pageSizeOptions without out-of-range pagination warnings", 
   expect(screen.getByText(/1–6 of 6/i)).toBeInTheDocument();
 });
 
+test("treats custom pageSizeOptions -1 as all rows", () => {
+  render(
+    <UniversalTable
+      data={data}
+      headers={headers}
+      name="All Rows"
+      loading={false}
+      pageSizeOptions={[-1]}
+    />,
+  );
+
+  expect(screen.getByText("John Doe")).toBeInTheDocument();
+  expect(screen.getByText("Diana Davis")).toBeInTheDocument();
+  expect(screen.getByText(/1–6 of 6/i)).toBeInTheDocument();
+});
+
 // ---------------------------------------------------------------------------
 // onReload callback
 // ---------------------------------------------------------------------------

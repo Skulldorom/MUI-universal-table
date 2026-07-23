@@ -57,9 +57,12 @@ function EnhancedTable(props) {
     asyncPages,
   });
 
+  const effectiveRowsPerPage = rowsPerPage === -1 ? rows.length : rowsPerPage;
+
   const emptyRows = Math.max(
     0,
-    rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage),
+    effectiveRowsPerPage -
+      Math.min(effectiveRowsPerPage, rows.length - page * effectiveRowsPerPage),
   );
 
   const isSelected = React.useCallback(
@@ -73,8 +76,11 @@ function EnhancedTable(props) {
       getComparator(order, orderBy),
       headers,
       orderBy,
-    ).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [headers, order, orderBy, page, rows, rowsPerPage]);
+    ).slice(
+      page * effectiveRowsPerPage,
+      page * effectiveRowsPerPage + effectiveRowsPerPage,
+    );
+  }, [effectiveRowsPerPage, headers, order, orderBy, page, rows]);
 
   return (
     <TableContainer>
@@ -103,7 +109,7 @@ function EnhancedTable(props) {
               {visibleRows.map((row, index) => {
                 const rowKey = selectID
                   ? row[selectID]
-                  : `row-${page * rowsPerPage + index}`;
+                  : `row-${page * effectiveRowsPerPage + index}`;
                 const rowID = getSelectableRowId(row, index, selectID);
 
                 return (

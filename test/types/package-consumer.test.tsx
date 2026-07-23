@@ -50,10 +50,21 @@ const asyncProps: UniversalTableProps = {
   persistSearch: true,
 };
 
+const syncProps: UniversalTableProps = {
+  data: rows,
+  headers,
+  name: "Sync users",
+  loading: false,
+  setLoading: (loading: boolean) => {
+    loading.valueOf();
+  },
+};
+
 export function ConsumerExamples() {
   return (
     <>
       <UniversalTable {...asyncProps} />
+      <UniversalTable {...syncProps} />
       <NamedUniversalTable
         data={[{ id: 1, children: rows }]}
         headers={nestedHeaders}
