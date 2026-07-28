@@ -9,8 +9,8 @@ import { SubRowToggleCell, SubTableRow } from "./SubTableRow";
 import { splitHeaders, formatCellValue } from "../utils/tableUtils";
 
 function renderDataCells(headers, rowValues) {
-  return headers.map((header, index) => (
-    <TableCell key={header.id || index} {...header.cellProps}>
+  return headers.map((header) => (
+    <TableCell key={header.id ?? header.label} {...header.cellProps}>
       {header.component
         ? header.component(rowValues)
         : formatCellValue(header, rowValues)}
@@ -68,7 +68,7 @@ const DataRow = React.memo(function DataRow(props) {
         )}
         {subTables.map((header, index) => (
           <SubRowToggleCell
-            key={header.id || index}
+            key={header.id ?? header.label}
             header={header}
             isOpen={reveal[index]}
             onToggle={() => toggleSubRow(index)}
@@ -80,7 +80,7 @@ const DataRow = React.memo(function DataRow(props) {
       </TableRow>
       {subTables.map((table, index) => (
         <SubTableRow
-          key={table.id || index}
+          key={table.id ?? table.label}
           table={table}
           isOpen={reveal[index]}
           rowValues={rowValues}

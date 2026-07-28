@@ -1,4 +1,3 @@
-import React from "react";
 import PropTypes from "prop-types";
 import { Box, Collapse, IconButton, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";

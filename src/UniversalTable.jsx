@@ -31,6 +31,7 @@ export default function UniversalTable({
   asyncPages,
 }) {
   const debounceRef = React.useRef(null);
+  const hasLoadedInitialAsyncPageRef = React.useRef(false);
 
   const async = typeof asyncPages === "number" && asyncPages > 0;
 
@@ -79,18 +80,18 @@ export default function UniversalTable({
   }, []);
 
   React.useEffect(() => {
-    if (async) {
-      setLoading({
-        searchTerm,
-        direction: order,
-        column: orderBy,
-        pages: asyncPages,
-      });
+    if (!async || hasLoadedInitialAsyncPageRef.current) {
+      return;
     }
-    // Run the initial async load once on mount; search/sort/reload handlers
-    // send their own payloads after user interaction.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    hasLoadedInitialAsyncPageRef.current = true;
+    setLoading({
+      searchTerm,
+      direction: order,
+      column: orderBy,
+      pages: asyncPages,
+    });
+  }, [async, asyncPages, order, orderBy, searchTerm, setLoading]);
 
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {

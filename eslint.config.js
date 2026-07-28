@@ -1,18 +1,17 @@
+import eslintReact from "@eslint-react/eslint-plugin";
 import js from "@eslint/js";
-import react from "eslint-plugin-react";
-import reactHooks from "eslint-plugin-react-hooks";
-import tseslint from "@typescript-eslint/eslint-plugin";
-import tsparser from "@typescript-eslint/parser";
 import globals from "globals";
 
 export default [
+  {
+    ignores: ["dist/**", "node_modules/**", "*.d.ts"],
+  },
   js.configs.recommended,
   {
-    files: ["**/*.{js,jsx,ts,tsx}"],
+    files: ["src/**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      parser: tsparser,
       parserOptions: {
         ecmaFeatures: {
           jsx: true,
@@ -21,24 +20,17 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.es2021,
-        React: "readonly",
       },
     },
     plugins: {
-      react,
-      "react-hooks": reactHooks,
-      "@typescript-eslint": tseslint,
+      ...eslintReact.configs.recommended.plugins,
+    },
+    settings: {
+      ...eslintReact.configs.recommended.settings,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
-      "react/jsx-uses-vars": "error",
-      "react/jsx-uses-react": "error",
+      ...eslintReact.configs.recommended.rules,
       "no-console": "warn",
-      "no-unused-vars": "warn",
-      "react-hooks/exhaustive-deps": "warn",
     },
-  },
-  {
-    ignores: ["*.d.ts", "dist/", "node_modules/"],
   },
 ];
