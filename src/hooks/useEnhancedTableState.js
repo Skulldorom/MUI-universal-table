@@ -28,7 +28,9 @@ export default function useEnhancedTableState({
   }));
 
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // Resetting derived pagination state here intentionally preserves the
+    // current rows-per-page choice while jumping back to the first page.
+    // eslint-disable-next-line @eslint-react/set-state-in-effect
     setPagination((previous) => {
       if (previous.resetFlag === resetFlag) {
         return previous;

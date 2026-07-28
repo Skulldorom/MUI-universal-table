@@ -1,4 +1,3 @@
-import React from "react";
 import {
   TableBody,
   TableCell,
@@ -7,15 +6,18 @@ import {
   TableHead,
 } from "@mui/material";
 
+const skeletonRows = ["row-1", "row-2", "row-3", "row-4", "row-5"];
+const skeletonCells = ["cell-1", "cell-2", "cell-3", "cell-4"];
+
 const TableLoader = () => {
   return (
     <>
       <TableHead />
       <TableBody>
-        {Array.from({ length: 5 }).map((_, index) => (
-          <TableRow key={index}>
-            {Array.from({ length: 4 }).map((_, cellIndex) => (
-              <TableCell key={cellIndex}>
+        {skeletonRows.map((rowKey) => (
+          <TableRow key={rowKey}>
+            {skeletonCells.map((cellKey) => (
+              <TableCell key={cellKey}>
                 <Skeleton height={30} />
               </TableCell>
             ))}

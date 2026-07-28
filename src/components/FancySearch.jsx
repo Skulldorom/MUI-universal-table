@@ -26,7 +26,7 @@ export default function FancySearch({ value, onSubmit }) {
   // Sync internal state when the parent clears/changes the search term.
   // A ref tracks whether this sync came from the user typing or from a parent
   // update, so the debounce only fires for genuine user input.
-  const isUserType = React.useRef(false);
+  const isUserTypingRef = React.useRef(false);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -50,7 +50,7 @@ export default function FancySearch({ value, onSubmit }) {
           placeholder="Search"
           value={value}
           onChange={(e) => {
-            isUserType.current = true;
+            isUserTypingRef.current = true;
             onSubmit(e.target.value);
           }}
           sx={{
@@ -66,7 +66,7 @@ export default function FancySearch({ value, onSubmit }) {
           <Stack direction="row" spacing={0} sx={{ mr: 3, alignItems: "center" }}>
             <IconButton
               onClick={() => {
-                isUserType.current = false;
+                isUserTypingRef.current = false;
                 // Immediately clear instead of waiting for the debounce
                 onSubmit("");
               }}
