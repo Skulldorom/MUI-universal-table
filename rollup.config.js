@@ -47,7 +47,10 @@ export default [
         babelHelpers: "bundled",
         exclude: "node_modules/**",
         extensions: [".js", ".jsx"],
-        presets: ["@babel/preset-env", "@babel/preset-react"],
+        presets: [
+          "@babel/preset-env",
+          ["@babel/preset-react", { runtime: "automatic" }],
+        ],
       }),
       commonjs(),
     ],
