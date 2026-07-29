@@ -21,6 +21,16 @@ for (const file of requiredFiles) {
   }
 }
 
+for (const file of ["dist/index.cjs", "dist/index.esm.js"]) {
+  const bundle = await readFile(join(root, file), "utf8");
+
+  if (bundle.includes("React.createElement")) {
+    throw new Error(
+      `${file} contains an unbound React.createElement call; use the automatic JSX runtime`,
+    );
+  }
+}
+
 const esmEntry = await import(join(root, "dist/index.esm.js"));
 if (typeof esmEntry.default !== "function") {
   throw new Error("ESM default export is not a component function");
