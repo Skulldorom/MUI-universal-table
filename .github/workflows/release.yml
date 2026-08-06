@@ -1,0 +1,251 @@
+# Auto-versioning release workflow (canonical Variant B — npm/Node).
+# - PR merged to main with version:major label -> major bump
+# - PR merged to main with version:minor label -> minor bump
+# - PR merged to main without label (or direct push) -> patch bump
+# - Manual dispatch -> user chooses major/minor/patch
+# - Tag push v*.*.* -> idempotent publish (skips if release already exists)
+
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version_part:
+        description: Version increment
+        required: true
+        type: choice
+        default: patch
+        options:
+          - major
+          - minor
+          - patch
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+
+env:
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  LABEL_MAJOR: version:major
+  LABEL_MINOR: version:minor
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── Manual dispatch: run tests first ───────────────────────
+  test:
+    name: Run Tests
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/tests.yml
+
+  # ═══════════════════════════════════════════════════════════════
+  # Auto-version (workflow_run) + Manual dispatch (workflow_dispatch)
+  # ═══════════════════════════════════════════════════════════════
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: test
+    if: |
+      always() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == github.event.repository.default_branch) ||
+        github.event_name == 'workflow_dispatch'
+      )
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+
+      - run: npm ci
+
+      # ── Determine version part ──────────────────────────────
+      - name: Determine version part
+        id: version_part
+        run: |
+          # Skip if the checked-out commit is a version bump
+          if [ "${{ github.event_name }}" = "workflow_run" ] && git log -1 --pretty=%B | grep -q "\\[skip-version\\]"; then
+            echo "HEAD commit is a version bump ([skip-version] found) — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PART="${{ github.event.inputs.version_part }}"
+          else
+            # workflow_run: query PR labels
+            HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+            LABELS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" \
+              | jq --arg branch "$DEFAULT_BRANCH" -r \
+                '.[] | select(.base.ref == $branch and .merged_at != null) | .labels[].name' \
+              2>/dev/null || echo "")
+
+            if [ -z "$LABELS" ]; then
+              echo "No merged PR targeting $DEFAULT_BRANCH found for $HEAD_SHA — defaulting to patch"
+              PART="patch"
+            elif echo "$LABELS" | grep -qx "$LABEL_MAJOR"; then
+              echo "Found $LABEL_MAJOR label — bumping major"
+              PART="major"
+            elif echo "$LABELS" | grep -qx "$LABEL_MINOR"; then
+              echo "Found $LABEL_MINOR label — bumping minor"
+              PART="minor"
+            else
+              echo "Merged PR found but no $LABEL_MAJOR/$LABEL_MINOR label — defaulting to patch"
+              PART="patch"
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "part=$PART" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Sync to latest default branch (deterministic) ───────
+      - name: Sync to latest default branch
+        if: steps.version_part.outputs.skip != 'true'
+        run: |
+          git fetch origin "$DEFAULT_BRANCH"
+          git reset --hard "origin/$DEFAULT_BRANCH"
+
+      # ── Bump version ────────────────────────────────────────
+      - name: Bump version
+        id: bump
+        if: steps.version_part.outputs.skip != 'true'
+        run: |
+          npm version ${{ steps.version_part.outputs.part }} --no-git-tag-version
+          npm install --package-lock-only
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      # ── Commit + tag + push (before build/publish) ─────────
+      - name: Commit version bump and tag
+        id: commit
+        if: steps.version_part.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }}
+
+          [skip-version]"
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin "HEAD:$DEFAULT_BRANCH"
+          git push origin "${{ steps.bump.outputs.tag }}"
+
+      # ── Build + publish ─────────────────────────────────────
+      - name: Build package
+        if: steps.version_part.outputs.skip != 'true'
+        run: npm run build
+
+      - name: Publish to npm
+        if: steps.version_part.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --provenance --access public || {
+            PKG_VERSION=$(node -p "require('./package.json').version")
+            PKG_NAME=$(node -p "require('./package.json').name")
+            if npm view "$PKG_NAME@$PKG_VERSION" version &>/dev/null; then
+              echo "Package $PKG_NAME@$PKG_VERSION already published — continuing"
+            else
+              echo "Package $PKG_NAME@$PKG_VERSION not found on npm — publish failed"
+              exit 1
+            fi
+          }
+
+      # ── GitHub Release ──────────────────────────────────────
+      - name: Create GitHub Release
+        if: steps.version_part.outputs.skip != 'true' && steps.commit.outcome != 'failure'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: Release ${{ steps.bump.outputs.tag }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  # ═══════════════════════════════════════════════════════════════
+  # Tag push: idempotent — skips if release already exists
+  # ═══════════════════════════════════════════════════════════════
+  publish-existing-tag:
+    name: Publish existing tag
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ github.ref_name }}" &>/dev/null; then
+            echo "Release ${{ github.ref_name }} already exists — skipping (handled by publish job)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release found — will build and publish"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+
+      - if: steps.check.outputs.skip != 'true'
+        run: npm ci
+      - if: steps.check.outputs.skip != 'true'
+        run: npm run build
+
+      - name: Publish to npm (idempotent)
+        if: steps.check.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --provenance --access public || {
+            PKG_VERSION=$(node -p "require('./package.json').version")
+            PKG_NAME=$(node -p "require('./package.json').name")
+            if npm view "$PKG_NAME@$PKG_VERSION" version &>/dev/null; then
+              echo "Package $PKG_NAME@$PKG_VERSION already published — continuing"
+            else
+              echo "Package $PKG_NAME@$PKG_VERSION not found on npm — publish failed"
+              exit 1
+            fi
+          }
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ github.ref_name }}" &>/dev/null; then
+            echo "Release ${{ github.ref_name }} already exists — skipping"
+          else
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --generate-notes
+          fi
