@@ -71,7 +71,9 @@ export function ConsumerExamples() {
         name="Nested users"
         selectRows
         selectID="id"
-        onSelection={(selectedIds) => selectedIds.map(String)}
+        onSelection={(selectedIds) => {
+          selectedIds.map(String);
+        }}
       />
     </>
   );
