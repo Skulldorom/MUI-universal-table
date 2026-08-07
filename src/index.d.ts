@@ -62,8 +62,8 @@ interface UniversalTableCommonProps {
   selectID?: string;
   /** Custom icon for selection action */
   selectIcon?: ReactElement;
-  /** Callback when rows are selected */
-  onSelection?: (selectedIds: unknown[]) => void;
+  /** Callback when rows are selected — can return void or a Promise for async batch operations */
+  onSelection?: (selectedIds: unknown[]) => void | Promise<void>;
   /** Override default page size options (e.g. [10, 25, 50]) */
   pageSizeOptions?: number[];
   /** Persist search term to sessionStorage (requires name prop) */

@@ -57,6 +57,22 @@ export default function UniversalTable({
     },
     [clearSelection, setSearchTerm],
   );
+
+  const handleSelection = React.useCallback(
+    (selectedIds) => {
+      if (typeof onSelection !== "function") {
+        return;
+      }
+      const result = onSelection(selectedIds);
+      if (result instanceof Promise) {
+        result.then(() => clearSelection());
+        return;
+      }
+      clearSelection();
+    },
+    [onSelection, clearSelection],
+  );
+
   const handleSearch = (searchValue) => {
     if (async) {
       setSearchTerm(searchValue);
@@ -121,7 +137,7 @@ export default function UniversalTable({
       >
         <TableSelectionBanner
           selected={selected}
-          onSelection={onSelection}
+          onSelection={handleSelection}
           selectIcon={selectIcon}
         />
         <TableTitle name={name} subTable={subTable} />
