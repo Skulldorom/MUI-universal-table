@@ -179,6 +179,147 @@ test("select all checkbox selects all visible rows", async () => {
   expect(screen.getByText("3 selected")).toBeInTheDocument();
 });
 
+test("sync onSelection clears selection after callback returns", async () => {
+  const user = userEvent.setup();
+  const onSelection = jest.fn();
+
+  render(
+    <UniversalTable
+      data={selectableData}
+      headers={selectableHeaders}
+      name="Sync Clear"
+      loading={false}
+      selectRows={true}
+      selectID="id"
+      onSelection={onSelection}
+    />,
+  );
+
+  // Select all rows
+  const checkboxes = screen.getAllByRole("checkbox");
+  await user.click(checkboxes[0]);
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+  // Click the action button (TaskIcon in the banner)
+  const actionBtn = document.querySelector('[data-testid="TaskIcon"]').closest("button");
+  await user.click(actionBtn);
+
+  // onSelection called with selected IDs
+  expect(onSelection).toHaveBeenCalledTimes(1);
+  expect(onSelection).toHaveBeenCalledWith([1, 2, 3]);
+
+  // Selection should be cleared — banner gone
+  expect(screen.queryByText("3 selected")).not.toBeInTheDocument();
+});
+
+test("async onSelection clears selection after promise resolves", async () => {
+  const user = userEvent.setup();
+  let resolvePromise;
+  const promise = new Promise((resolve) => {
+    resolvePromise = resolve;
+  });
+  const onSelection = jest.fn(() => promise);
+
+  render(
+    <UniversalTable
+      data={selectableData}
+      headers={selectableHeaders}
+      name="Async Clear"
+      loading={false}
+      selectRows={true}
+      selectID="id"
+      onSelection={onSelection}
+    />,
+  );
+
+  // Select all rows
+  const checkboxes = screen.getAllByRole("checkbox");
+  await user.click(checkboxes[0]);
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+  // Click action button
+  const actionBtn = document.querySelector('[data-testid="TaskIcon"]').closest("button");
+  await user.click(actionBtn);
+
+  // onSelection should have been called
+  expect(onSelection).toHaveBeenCalledTimes(1);
+
+  // Selection should NOT be cleared yet — promise hasn't resolved
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+  // Resolve the promise
+  await act(async () => {
+    resolvePromise();
+    // Wait for microtask to flush
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  // Now selection should be cleared
+  expect(screen.queryByText("3 selected")).not.toBeInTheDocument();
+});
+
+test("async onSelection preserves selection while operation is pending", async () => {
+  const user = userEvent.setup();
+  // Promise that never settles — simulates long-running or failed operation
+  const pendingPromise = new Promise(() => {});
+  const onSelection = jest.fn(() => pendingPromise);
+
+  render(
+    <UniversalTable
+      data={selectableData}
+      headers={selectableHeaders}
+      name="Pending Preserve"
+      loading={false}
+      selectRows={true}
+      selectID="id"
+      onSelection={onSelection}
+    />,
+  );
+
+  // Select all rows
+  const checkboxes = screen.getAllByRole("checkbox");
+  await user.click(checkboxes[0]);
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+  // Click action button
+  const actionBtn = document.querySelector('[data-testid="TaskIcon"]').closest("button");
+  await user.click(actionBtn);
+
+  // onSelection was called
+  expect(onSelection).toHaveBeenCalledTimes(1);
+
+  // Selection should be PRESERVED — operation hasn't completed yet
+  await new Promise((r) => setTimeout(r, 0));
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+});
+
+test("no crash when onSelection is not provided", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <UniversalTable
+      data={selectableData}
+      headers={selectableHeaders}
+      name="No Callback"
+      loading={false}
+      selectRows={true}
+      selectID="id"
+    />,
+  );
+
+  // Select all rows
+  const checkboxes = screen.getAllByRole("checkbox");
+  await user.click(checkboxes[0]);
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+  // Click action button — should not crash
+  const actionBtn = document.querySelector('[data-testid="TaskIcon"]').closest("button");
+  await user.click(actionBtn);
+
+  // Selection should persist (no callback = no clear)
+  expect(screen.getByText("3 selected")).toBeInTheDocument();
+});
+
 // ---------------------------------------------------------------------------
 // Sorting
 // ---------------------------------------------------------------------------
