@@ -1,6 +1,6 @@
 # Documentation Website
 
-This website is built using [Docusaurus](https://docusaurus.io/) for the MUI Universal Table project.
+This website is built with [VitePress](https://vitepress.dev/) for the MUI Universal Table project.
 
 ## Installation
 
@@ -11,7 +11,7 @@ npm install
 ## Local development
 
 ```bash
-npm run start
+npm run dev
 ```
 
 ## Build
@@ -20,8 +20,8 @@ npm run start
 npm run build
 ```
 
-## Serve built site
+## Preview built site
 
 ```bash
-npm run serve
+npm run preview
 ```

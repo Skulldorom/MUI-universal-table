@@ -1,4 +1,4 @@
-# Builds and deploys the Docusaurus docs site to GitHub Pages on every push to main.
+# Builds and deploys the VitePress docs site to GitHub Pages on every push to main.
 name: Deploy Docs
 
 on:
@@ -37,13 +37,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Docusaurus site
+      - name: Build VitePress site
         run: npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: docs/build
+          path: docs/.vitepress/dist
 
   deploy:
     needs: build

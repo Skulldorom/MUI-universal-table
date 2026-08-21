@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 # Async / Server-side Usage
 
 Use async mode when your API handles searching and sorting.
