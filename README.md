@@ -7,6 +7,10 @@
 
 A comprehensive, feature-rich table component built with Material-UI for React applications.
 
+<p align="center">
+  <a href="https://ko-fi.com/skulldorom"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" /></a>
+</p>
+
 ## Features
 
 - 🔍 **Built-in Search** - Filter data across searchable columns
