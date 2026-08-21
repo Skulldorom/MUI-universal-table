@@ -3,6 +3,7 @@
 [![Tests](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/tests.yml/badge.svg)](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/tests.yml)
 [![Release](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/release.yml/badge.svg)](https://github.com/Skulldorom/MUI-universal-table/actions/workflows/release.yml)
 [![GitHub release](https://img.shields.io/github/v/release/Skulldorom/MUI-universal-table)](https://github.com/Skulldorom/MUI-universal-table/releases)
+[![Ko-fi](https://img.shields.io/badge/Support%20on-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/skulldorom)
 
 A comprehensive, feature-rich table component built with Material-UI for React applications.
 
@@ -118,9 +119,9 @@ Advanced usage examples (row selection, custom cells, and sub-tables) plus async
 
 MIT
 
-## Documentation Site (Docusaurus)
+## Documentation Site (VitePress)
 
-This repository includes a Docusaurus site in `/docs`.
+This repository includes a VitePress site in `/docs`.
 
 Run it locally:
 

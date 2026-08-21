@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # MUI Universal Table
 
 MUI Universal Table is a reusable React table component built on Material UI.
