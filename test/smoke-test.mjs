@@ -54,7 +54,10 @@ const packOutput = execFileSync(
   ["pack", "--dry-run", "--json", "--ignore-scripts"],
   { encoding: "utf8" },
 );
-const [packInfo] = JSON.parse(packOutput);
+const packResult = JSON.parse(packOutput);
+const packInfo = Array.isArray(packResult)
+  ? packResult[0]
+  : Object.values(packResult)[0];
 const packedFiles = new Set(packInfo.files.map((file) => file.path));
 
 for (const file of packageJson.files) {
