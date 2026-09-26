@@ -17,7 +17,12 @@ const peerDependencyExternals = [
 const babel = () => ({
   name: "babel",
   async transform(code, id) {
-    if (!id.endsWith(".js") && !id.endsWith(".jsx")) return null;
+    if (
+      (!id.endsWith(".js") && !id.endsWith(".jsx")) ||
+      /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(id)
+    ) {
+      return null;
+    }
 
     const result = await transformAsync(code, {
       filename: id,
@@ -30,7 +35,7 @@ const babel = () => ({
       sourceMaps: true,
     });
 
-    return { code: result.code, map: result.map };
+    return result && { code: result.code, map: result.map };
   },
 });
 
