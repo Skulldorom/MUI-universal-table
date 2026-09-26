@@ -1,6 +1,6 @@
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
-import { babel } from "@rollup/plugin-babel";
+import { transformAsync } from "@babel/core";
 import peerDepsExternal from "rollup-plugin-peer-deps-external";
 import { readFileSync } from "fs";
 
@@ -13,6 +13,26 @@ const peerDependencyExternals = [
   /^@emotion\/(?:.*)$/,
   /^prop-types(?:\/.*)?$/,
 ];
+
+const babel = () => ({
+  name: "babel",
+  async transform(code, id) {
+    if (!id.endsWith(".js") && !id.endsWith(".jsx")) return null;
+
+    const result = await transformAsync(code, {
+      filename: id,
+      babelrc: false,
+      configFile: false,
+      presets: [
+        ["@babel/preset-env", { modules: false }],
+        ["@babel/preset-react", { runtime: "automatic" }],
+      ],
+      sourceMaps: true,
+    });
+
+    return { code: result.code, map: result.map };
+  },
+});
 
 export default [
   {
@@ -43,15 +63,7 @@ export default [
       resolve({
         extensions: [".js", ".jsx"],
       }),
-      babel({
-        babelHelpers: "bundled",
-        exclude: "node_modules/**",
-        extensions: [".js", ".jsx"],
-        presets: [
-          "@babel/preset-env",
-          ["@babel/preset-react", { runtime: "automatic" }],
-        ],
-      }),
+      babel(),
       commonjs(),
     ],
     external: (id) =>
