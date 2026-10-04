@@ -28,9 +28,13 @@ const babel = () => ({
       filename: id,
       babelrc: false,
       configFile: false,
+      envName: "production",
       presets: [
         ["@babel/preset-env", { modules: false }],
-        ["@babel/preset-react", { runtime: "automatic" }],
+        [
+          "@babel/preset-react",
+          { runtime: "automatic", development: false },
+        ],
       ],
       sourceMaps: true,
     });
