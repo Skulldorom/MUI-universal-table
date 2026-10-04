@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -21,13 +22,21 @@ for (const file of requiredFiles) {
   }
 }
 
-for (const file of ["dist/index.cjs", "dist/index.esm.js"]) {
+const distributableJavaScript = ["dist/index.cjs", "dist/index.esm.js"];
+
+for (const file of distributableJavaScript) {
   const bundle = await readFile(join(root, file), "utf8");
 
   if (bundle.includes("React.createElement")) {
     throw new Error(
       `${file} contains an unbound React.createElement call; use the automatic JSX runtime`,
     );
+  }
+  if (bundle.includes("jsxDEV") || bundle.includes("react/jsx-dev-runtime")) {
+    throw new Error(`${file} contains the development JSX runtime`);
+  }
+  if (!bundle.includes("react/jsx-runtime")) {
+    throw new Error(`${file} does not reference the automatic JSX runtime`);
   }
 }
 
@@ -77,4 +86,56 @@ for (const file of requiredFiles) {
   }
 }
 
-console.log("Smoke test passed: package entrypoints load and npm pack contains release files.");
+const packageTempDirectory = await mkdtemp(join(tmpdir(), "mui-universal-table-pack-"));
+const packageExtractDirectory = await mkdtemp(
+  join(tmpdir(), "mui-universal-table-extract-"),
+);
+try {
+  const packageOutput = execFileSync(
+    "npm",
+    ["pack", "--json", "--ignore-scripts", "--pack-destination", packageTempDirectory],
+    { cwd: root, encoding: "utf8" },
+  );
+  const packageResult = JSON.parse(packageOutput);
+  const packageInfo = Array.isArray(packageResult)
+    ? packageResult[0]
+    : Object.values(packageResult)[0];
+  const packedTarball = join(packageTempDirectory, packageInfo.filename);
+  execFileSync("tar", ["-xzf", packedTarball, "-C", packageExtractDirectory]);
+
+  const packedJavaScript = packageInfo.files
+    .map(({ path }) => path)
+    .filter((file) => file.endsWith(".js"));
+
+  for (const file of packedJavaScript) {
+    const packedBundle = await readFile(
+      join(packageExtractDirectory, "package", file),
+      "utf8",
+    );
+    if (
+      packedBundle.includes("jsxDEV") ||
+      packedBundle.includes("react/jsx-dev-runtime")
+    ) {
+      throw new Error(`Packed ${file} contains the development JSX runtime`);
+    }
+  }
+
+  for (const file of distributableJavaScript) {
+    const packedBundle = await readFile(
+      join(packageExtractDirectory, "package", file),
+      "utf8",
+    );
+    if (!packedBundle.includes("react/jsx-runtime")) {
+      throw new Error(`Packed ${file} does not reference the automatic JSX runtime`);
+    }
+  }
+} finally {
+  await Promise.all([
+    rm(packageTempDirectory, { recursive: true, force: true }),
+    rm(packageExtractDirectory, { recursive: true, force: true }),
+  ]);
+}
+
+console.log(
+  "Smoke test passed: production entrypoints load and packed artifacts use the automatic JSX runtime.",
+);

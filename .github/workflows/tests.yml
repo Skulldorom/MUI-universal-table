@@ -64,3 +64,6 @@ jobs:
 
       - name: Build and smoke-test package
         run: npm run test:smoke
+
+      - name: Build packed package in React/Vite consumer
+        run: npm run test:consumer
