@@ -43,7 +43,7 @@
     "lint:fix": "eslint src --fix",
     "test:unit": "npm test -- --runInBand",
     "test:smoke": "npm run build && node test/smoke-test.mjs",
-    "test:consumer": "node test/consumer-build-test.mjs",
+    "test:consumer": "npm run build && node test/consumer-build-test.mjs",
     "test:types": "tsc --noEmit --project tsconfig.test.json"
   },
   "peerDependencies": {

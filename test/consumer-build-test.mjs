@@ -66,6 +66,31 @@ try {
     cwd: workspace,
     stdio: "inherit",
   });
+  execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { UniversalTable } from "mui-universal-table";
+
+const markup = renderToStaticMarkup(
+  React.createElement(UniversalTable, {
+    data: [],
+    headers: [],
+    name: "Consumer runtime test",
+    loading: false,
+  }),
+);
+if (!markup.includes("Consumer runtime test")) {
+  throw new Error("Packed UniversalTable did not render expected SSR output");
+}
+console.log("Packed package production runtime execution passed.");
+`,
+    ],
+    { cwd: workspace, env: { ...process.env, NODE_ENV: "production" }, stdio: "inherit" },
+  );
   execFileSync("npx", ["vite", "build"], { cwd: workspace, stdio: "inherit" });
 
   const assetsDirectory = join(workspace, "dist", "assets");

@@ -105,7 +105,11 @@ try {
 
   const packedJavaScript = packageInfo.files
     .map(({ path }) => path)
-    .filter((file) => file.endsWith(".js"));
+    .filter((file) => /\.(?:js|cjs|mjs)$/.test(file));
+
+  if (packedJavaScript.length === 0) {
+    throw new Error("npm pack did not include any distributable JavaScript files");
+  }
 
   for (const file of packedJavaScript) {
     const packedBundle = await readFile(
