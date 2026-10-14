@@ -2,6 +2,8 @@ import React from "react";
 import UniversalTable, { UniversalTable as NamedUniversalTable } from "../../src/index.js";
 import type {
   AsyncLoadingPayload,
+  FetchRowsQuery,
+  FetchRowsResult,
   TableHeader,
   UniversalTableProps,
 } from "../../src/index.d.ts";
@@ -60,11 +62,38 @@ const syncProps: UniversalTableProps = {
   },
 };
 
+const fetchRows = async (query: FetchRowsQuery): Promise<FetchRowsResult> => {
+  query.page.toFixed();
+  query.searchTerm.toUpperCase();
+  query.column.toUpperCase();
+  query.direction.toUpperCase();
+  query.signal.aborted.valueOf();
+  return { rows, totalCount: rows.length };
+};
+
+const fetchProps: UniversalTableProps = {
+  headers,
+  name: "Server-paginated users",
+  fetchRows,
+  filters: { status: "open" },
+  reset: 0,
+  pageSizeOptions: [10, 25],
+  persistSearch: true,
+};
+
+// @ts-expect-error — fetchRows mode does not accept `data`
+const invalidFetchProps: UniversalTableProps = {
+  headers,
+  fetchRows,
+  data: rows,
+};
+
 export function ConsumerExamples() {
   return (
     <>
       <UniversalTable {...asyncProps} />
       <UniversalTable {...syncProps} />
+      <UniversalTable {...fetchProps} />
       <NamedUniversalTable
         data={[{ id: 1, children: rows }]}
         headers={nestedHeaders}

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
 const requiredFiles = [
@@ -40,7 +41,7 @@ for (const file of distributableJavaScript) {
   }
 }
 
-const esmEntry = await import(join(root, "dist/index.esm.js"));
+const esmEntry = await import(pathToFileURL(join(root, "dist/index.esm.js")).href);
 if (typeof esmEntry.default !== "function") {
   throw new Error("ESM default export is not a component function");
 }
@@ -58,10 +59,14 @@ if (typeof cjsEntry.UniversalTable !== "function") {
 }
 
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+// On Windows, npm is npm.cmd, which requires a shell to spawn (CVE-2024-27980).
+const onWindows = process.platform === "win32";
+const npmCommand = onWindows ? "npm.cmd" : "npm";
+const npmShell = onWindows;
 const packOutput = execFileSync(
-  "npm",
+  npmCommand,
   ["pack", "--dry-run", "--json", "--ignore-scripts"],
-  { encoding: "utf8" },
+  { encoding: "utf8", shell: npmShell },
 );
 const packResult = JSON.parse(packOutput);
 const packInfo = Array.isArray(packResult)
@@ -92,9 +97,15 @@ const packageExtractDirectory = await mkdtemp(
 );
 try {
   const packageOutput = execFileSync(
-    "npm",
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", packageTempDirectory],
-    { cwd: root, encoding: "utf8" },
+    npmCommand,
+    [
+      "pack",
+      "--json",
+      "--ignore-scripts",
+      "--pack-destination",
+      npmShell ? `"${packageTempDirectory}"` : packageTempDirectory,
+    ],
+    { cwd: root, encoding: "utf8", shell: npmShell },
   );
   const packageResult = JSON.parse(packageOutput);
   const packageInfo = Array.isArray(packageResult)

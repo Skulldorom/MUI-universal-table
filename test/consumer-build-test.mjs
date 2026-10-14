@@ -4,6 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = process.cwd();
+// On Windows, npm/npx are .cmd shims, which require a shell to spawn (CVE-2024-27980).
+const onWindows = process.platform === "win32";
+const npmCommand = onWindows ? "npm.cmd" : "npm";
+const npxCommand = onWindows ? "npx.cmd" : "npx";
+const shellOption = onWindows;
 const workspace = await mkdtemp(join(tmpdir(), "mui-universal-table-consumer-"));
 const sourceDirectory = join(workspace, "src");
 
@@ -47,9 +52,15 @@ try {
   );
 
   const packageOutput = execFileSync(
-    "npm",
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", workspace],
-    { cwd: root, encoding: "utf8" },
+    npmCommand,
+    [
+      "pack",
+      "--json",
+      "--ignore-scripts",
+      "--pack-destination",
+      shellOption ? `"${workspace}"` : workspace,
+    ],
+    { cwd: root, encoding: "utf8", shell: shellOption },
   );
   const packageResult = JSON.parse(packageOutput);
   const packageInfo = Array.isArray(packageResult)
@@ -62,9 +73,10 @@ try {
     workspace,
   ]);
 
-  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
+  execFileSync(npmCommand, ["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
     cwd: workspace,
     stdio: "inherit",
+    shell: shellOption,
   });
   execFileSync(
     process.execPath,
@@ -91,7 +103,11 @@ console.log("Packed package production runtime execution passed.");
     ],
     { cwd: workspace, env: { ...process.env, NODE_ENV: "production" }, stdio: "inherit" },
   );
-  execFileSync("npx", ["vite", "build"], { cwd: workspace, stdio: "inherit" });
+  execFileSync(npxCommand, ["vite", "build"], {
+    cwd: workspace,
+    stdio: "inherit",
+    shell: shellOption,
+  });
 
   const assetsDirectory = join(workspace, "dist", "assets");
   for (const asset of await readdir(assetsDirectory)) {

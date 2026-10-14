@@ -2,12 +2,16 @@ import React from "react";
 import PropTypes from "prop-types";
 import {
   Box,
+  Button,
+  Skeleton,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TablePagination,
   TableRow,
+  Typography,
 } from "@mui/material";
 import useEnhancedTableState from "../hooks/useEnhancedTableState";
 import {
@@ -35,7 +39,9 @@ function EnhancedTable(props) {
     orderBy,
     async,
     asyncPages,
+    fetchState,
   } = props;
+  const fetchMode = Boolean(fetchState);
   const dense = true;
   const {
     page,
@@ -82,6 +88,55 @@ function EnhancedTable(props) {
     );
   }, [effectiveRowsPerPage, headers, order, orderBy, page, rows]);
 
+  // Server pagination ("fetch rows" mode): when the visible window extends
+  // past the rows loaded so far, pull in the next server page. The strict `>`
+  // means a fully-covered first page does not trigger an eager fetch.
+  const onLoadMore = fetchState?.onLoadMore;
+  React.useEffect(() => {
+    if (!fetchMode || typeof onLoadMore !== "function") {
+      return;
+    }
+    if (
+      props.loading ||
+      fetchState.loadingMore ||
+      fetchState.loadMoreError ||
+      !fetchState.hasMore
+    ) {
+      return;
+    }
+    if ((page + 1) * effectiveRowsPerPage > rows.length && rows.length > 0) {
+      onLoadMore();
+    }
+  }, [
+    fetchMode,
+    onLoadMore,
+    props.loading,
+    fetchState?.loadingMore,
+    fetchState?.loadMoreError,
+    fetchState?.hasMore,
+    page,
+    effectiveRowsPerPage,
+    rows.length,
+  ]);
+
+  const columnCount = headers.length + (props.selectRows ? 1 : 0);
+  const onLastLoadedPage =
+    rows.length === 0 ||
+    (page + 1) * effectiveRowsPerPage >= rows.length;
+  const showEndOfData =
+    fetchMode &&
+    !fetchState.hasMore &&
+    !fetchState.loadingMore &&
+    !fetchState.loadMoreError &&
+    rows.length > 0 &&
+    onLastLoadedPage;
+  const showEmptyFiller =
+    !subTable &&
+    emptyRows > 0 &&
+    !fetchState?.loadingMore &&
+    !fetchState?.loadMoreError &&
+    !showEndOfData;
+
   return (
     <TableContainer>
       <Table
@@ -91,6 +146,42 @@ function EnhancedTable(props) {
       >
         {props.loading ? (
           <TableLoader />
+        ) : fetchState?.error ? (
+          <>
+            <EnhancedTableHead
+              order={order}
+              orderBy={orderBy}
+              onRequestSort={handleSort}
+              headings={headers}
+              selectRows={props.selectRows}
+              numSelected={selected.length}
+              rowCount={rows.length}
+              onSelectAllClick={props.handleSelectAllClick}
+              async={async}
+            />
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={columnCount} align="center">
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      py: 2,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography variant="body2" color="error">
+                      Couldn&apos;t load data.
+                    </Typography>
+                    <Button size="small" onClick={() => fetchState.onRetry()}>
+                      Retry
+                    </Button>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </>
         ) : (
           <>
             <EnhancedTableHead
@@ -125,7 +216,44 @@ function EnhancedTable(props) {
                   />
                 );
               })}
-              {!subTable && emptyRows > 0 && (
+              {fetchMode && fetchState.loadingMore && (
+                <TableRow>
+                  <TableCell colSpan={columnCount}>
+                    <Skeleton height={30} />
+                  </TableCell>
+                </TableRow>
+              )}
+              {fetchMode && fetchState.loadMoreError && (
+                <TableRow>
+                  <TableCell colSpan={columnCount} align="center">
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ justifyContent: "center", alignItems: "center" }}
+                    >
+                      <Typography variant="body2" color="error">
+                        Couldn&apos;t load more results.
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => fetchState.onLoadMore()}
+                      >
+                        Retry
+                      </Button>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              )}
+              {showEndOfData && (
+                <TableRow>
+                  <TableCell colSpan={columnCount} align="center">
+                    <Typography variant="body2" color="text.secondary">
+                      No more results
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {showEmptyFiller && (
                 <TableRow style={{ height: (dense ? 33 : 53) * emptyRows }}>
                   <TableCell colSpan={headers.length} />
                 </TableRow>
@@ -142,7 +270,7 @@ function EnhancedTable(props) {
             props.pageSizeOptions || getPageOptions(rows.length)
           }
           component="div"
-          count={rows.length}
+          count={fetchMode ? (fetchState.totalCount ?? rows.length) : rows.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
@@ -168,7 +296,7 @@ EnhancedTable.propTypes = {
   selected: PropTypes.array,
   selectID: PropTypes.string,
   async: PropTypes.bool,
-  resetFlag: PropTypes.string,
+  resetFlag: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   pageSizeOptions: PropTypes.arrayOf(PropTypes.number),
   name: PropTypes.string,
   setLoading: PropTypes.func,
@@ -178,6 +306,15 @@ EnhancedTable.propTypes = {
   order: PropTypes.string,
   orderBy: PropTypes.string,
   asyncPages: PropTypes.number,
+  fetchState: PropTypes.shape({
+    totalCount: PropTypes.number,
+    hasMore: PropTypes.bool,
+    loadingMore: PropTypes.bool,
+    loadMoreError: PropTypes.bool,
+    error: PropTypes.bool,
+    onLoadMore: PropTypes.func,
+    onRetry: PropTypes.func,
+  }),
 };
 
 export default EnhancedTable;
