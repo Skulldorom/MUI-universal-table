@@ -11,7 +11,7 @@ server total.
 <UniversalTable
   headers={headers}
   name="Users"
-  fetchRows={async ({ filters, signal }) => {
+  fetchRows={async (filters, signal) => {
     if (filters.page === 1) {
       const [rows, count] = await Promise.all([
         api.getUsers(filters, signal),
@@ -25,19 +25,22 @@ server total.
 />
 ```
 
-The query object the table passes to `fetchRows`:
+`fetchRows` is called with two arguments — the filter payload and an abort
+signal:
 
 ```ts
+fetchRows(filters, signal);
+
+// filters:
 {
-  filters: {
-    page: number;                  // server page requested (1-based)
-    searchTerm: string;
-    column: string;
-    direction: "asc" | "desc";
-    ...yourFilters;                // spread of the `filters` prop
-  };
-  signal: AbortSignal;             // aborted when the query is superseded
+  page: number;                  // server page requested (1-based)
+  searchTerm: string;
+  column: string;
+  direction: "asc" | "desc";
+  ...yourFilters;                // spread of the `filters` prop
 }
+
+// signal: AbortSignal — aborted when the query is superseded
 ```
 
 Return `{ rows, totalCount }`. Provide `totalCount` on page 1 — it drives the
@@ -78,8 +81,8 @@ const [filters, setFilters] = React.useState({ status: "", currency: "" });
   headers={headers}
   name="Orders"
   filters={filters}
-  fetchRows={async ({ filters: query, signal }) => {
-    const rows = await api.getOrders(query, signal);
+  fetchRows={async (filters, signal) => {
+    const rows = await api.getOrders(filters, signal);
     return { rows };
   }}
 />
@@ -202,15 +205,15 @@ with `fetchRows`:
 + <UniversalTable
 +   filters={filters}
 +   reset={reset}
-+   fetchRows={async ({ filters: query, signal }) => {
-+     if (query.page === 1) {
++   fetchRows={async (filters, signal) => {
++     if (filters.page === 1) {
 +       const [rows, pages] = await Promise.all([
-+         getOrders(query, signal),
-+         getOrderPages(query),
++         getOrders(filters, signal),
++         getOrderPages(filters),
 +       ]);
 +       return { rows, totalCount: pages.filterCount * PAGE_SIZE };
 +     }
-+     return { rows: await getOrders(query, signal) };
++     return { rows: await getOrders(filters, signal) };
 +   }}
 + />
 ```

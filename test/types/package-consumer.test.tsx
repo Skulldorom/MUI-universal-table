@@ -36,13 +36,16 @@ const syncProps: UniversalTableProps = {
   },
 };
 
-const fetchRows = async (query: FetchRowsQuery): Promise<FetchRowsResult> => {
-  query.filters.page.toFixed();
-  query.filters.searchTerm.toUpperCase();
-  query.filters.column.toUpperCase();
-  query.filters.direction.toUpperCase();
-  String(query.filters.status);
-  query.signal.aborted.valueOf();
+const fetchRows = async (
+  filters: FetchRowsQuery,
+  signal: AbortSignal,
+): Promise<FetchRowsResult> => {
+  filters.page.toFixed();
+  filters.searchTerm.toUpperCase();
+  filters.column.toUpperCase();
+  filters.direction.toUpperCase();
+  String(filters.status);
+  signal.aborted.valueOf();
   return { rows, totalCount: rows.length };
 };
 

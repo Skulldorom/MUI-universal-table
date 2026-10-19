@@ -142,8 +142,8 @@ export default function useFetchRowsState({
           : {};
 
       try {
-        const result = await current.fetchRows({
-          filters: {
+        const result = await current.fetchRows(
+          {
             ...consumerFilters,
             page,
             searchTerm: current.searchTerm,
@@ -151,7 +151,7 @@ export default function useFetchRowsState({
             direction: current.direction,
           },
           signal,
-        });
+        );
         if (generation !== generationRef.current) {
           return;
         }

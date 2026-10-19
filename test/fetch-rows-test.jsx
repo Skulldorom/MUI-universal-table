@@ -56,12 +56,12 @@ test("initial load issues exactly one page-1 request and renders rows + server t
   render(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} />);
 
   expect(fetchRows).toHaveBeenCalledTimes(1);
-  const query = fetchRows.mock.calls[0][0].filters;
+  const query = fetchRows.mock.calls[0][0];
   expect(query.page).toBe(1);
   expect(query.searchTerm).toBe("");
   expect(query.column).toBe("");
   expect(query.direction).toBe("asc");
-  expect(fetchRows.mock.calls[0][0].signal).toBeInstanceOf(AbortSignal);
+  expect(fetchRows.mock.calls[0][1]).toBeInstanceOf(AbortSignal);
 
   // Skeleton while the first page is in flight
   expect(document.querySelectorAll(".MuiSkeleton-root").length).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ test("paginating to the end of loaded rows fetches exactly the next page", async
   await user.click(screen.getByRole("button", { name: /next page/i }));
 
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  expect(lastQuery(fetchRows).filters.page).toBe(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
 
   // While appending: header intact (not the full-table skeleton) and the
   // inline loading-more skeleton shows in place of the not-yet-loaded slice
@@ -210,7 +210,7 @@ test("without totalCount the next page stays reachable via pager headroom", asyn
   await user.click(next);
 
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  expect(lastQuery(fetchRows).filters.page).toBe(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
 
   await act(async () => {
     requests[1].resolve({ rows: makeRows(2) }); // still no totalCount
@@ -233,7 +233,7 @@ test("jump to last loads only one additional page (no cascade)", async () => {
 
   // Only the immediate next server page is requested, not the whole run
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  expect(lastQuery(fetchRows).filters.page).toBe(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
 
   await act(async () => {
     requests[1].resolve({ rows: makeRows(2), totalCount: 100 });
@@ -295,7 +295,7 @@ test("search resets to page 1 with the search term after debounce", async () => 
     });
 
     expect(fetchRows).toHaveBeenCalledTimes(2);
-    const query = lastQuery(fetchRows).filters;
+    const query = lastQuery(fetchRows);
     expect(query.page).toBe(1);
     expect(query.searchTerm).toBe("Jane");
 
@@ -326,7 +326,7 @@ test("a query change aborts the in-flight request", async () => {
     });
 
     expect(fetchRows).toHaveBeenCalledTimes(2);
-    const firstSignal = fetchRows.mock.calls[0][0].signal;
+    const firstSignal = fetchRows.mock.calls[0][1];
     expect(firstSignal.aborted).toBe(true);
 
     await act(async () => {
@@ -385,9 +385,9 @@ test("sortable column click resets to page 1 with sort params, which persist to 
 
   expect(fetchRows).toHaveBeenCalledTimes(2);
   const sortQuery = lastQuery(fetchRows);
-  expect(sortQuery.filters.page).toBe(1);
-  expect(sortQuery.filters.column).toBe("name");
-  expect(sortQuery.filters.direction).toBe("desc");
+  expect(sortQuery.page).toBe(1);
+  expect(sortQuery.column).toBe("name");
+  expect(sortQuery.direction).toBe("desc");
 
   await act(async () => {
     requests[1].resolve({ rows: makeRows(1), totalCount: 12 });
@@ -397,9 +397,9 @@ test("sortable column click resets to page 1 with sort params, which persist to 
   await user.click(screen.getByRole("button", { name: /next page/i }));
   expect(fetchRows).toHaveBeenCalledTimes(3);
   const nextPageQuery = lastQuery(fetchRows);
-  expect(nextPageQuery.filters.page).toBe(2);
-  expect(nextPageQuery.filters.column).toBe("name");
-  expect(nextPageQuery.filters.direction).toBe("desc");
+  expect(nextPageQuery.page).toBe(2);
+  expect(nextPageQuery.column).toBe("name");
+  expect(nextPageQuery.direction).toBe("desc");
 });
 
 // ---------------------------------------------------------------------------
@@ -418,7 +418,7 @@ test("reload button refetches from page 1 with the current query", async () => {
   await user.click(screen.getByRole("button", { name: /reload/i }));
 
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  expect(lastQuery(fetchRows).filters.page).toBe(1);
+  expect(lastQuery(fetchRows).page).toBe(1);
 });
 
 // ---------------------------------------------------------------------------
@@ -454,7 +454,7 @@ test("failed next-page fetch keeps loaded rows and can be retried", async () => 
   await user.click(retryButton);
 
   expect(fetchRows).toHaveBeenCalledTimes(3);
-  expect(lastQuery(fetchRows).filters.page).toBe(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
 
   await act(async () => {
     requests[2].resolve({ rows: makeRows(2), totalCount: 12 });
@@ -480,7 +480,7 @@ test("failed initial load shows an error state and retries from page 1", async (
 
   await user.click(screen.getByRole("button", { name: /retry/i }));
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  expect(lastQuery(fetchRows).filters.page).toBe(1);
+  expect(lastQuery(fetchRows).page).toBe(1);
 
   await act(async () => {
     requests[1].resolve({ rows: makeRows(1), totalCount: 5 });
@@ -504,7 +504,7 @@ test("changing the filters prop value resets to page 1 and passes filters throug
   );
 
   expect(fetchRows).toHaveBeenCalledTimes(1);
-  expect(fetchRows.mock.calls[0][0].filters).toMatchObject({ status: "open" });
+  expect(fetchRows.mock.calls[0][0]).toMatchObject({ status: "open" });
 
   await act(async () => {
     requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
@@ -531,7 +531,7 @@ test("changing the filters prop value resets to page 1 and passes filters throug
     />,
   );
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  const query = lastQuery(fetchRows).filters;
+  const query = lastQuery(fetchRows);
   expect(query.page).toBe(1);
   expect(query.status).toBe("closed");
 
@@ -541,7 +541,7 @@ test("changing the filters prop value resets to page 1 and passes filters throug
   });
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: /next page/i }));
-  expect(lastQuery(fetchRows).filters).toMatchObject({ status: "closed" });
+  expect(lastQuery(fetchRows)).toMatchObject({ status: "closed" });
 });
 
 // ---------------------------------------------------------------------------
@@ -573,7 +573,7 @@ test("changing the reset signal discards loaded rows and refetches from page 1",
   // Mutation → bump the reset counter → fresh page 1
   rerender(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} reset={1} />);
   expect(fetchRows).toHaveBeenCalledTimes(3);
-  expect(lastQuery(fetchRows).filters.page).toBe(1);
+  expect(lastQuery(fetchRows).page).toBe(1);
 
   await act(async () => {
     requests[2].resolve({ rows: [{ name: "Reloaded", email: "r@x.com" }], totalCount: 1 });
@@ -741,7 +741,7 @@ test("bumping loadMoreSignal appends the next page", async () => {
     />,
   );
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  expect(lastQuery(fetchRows).filters.page).toBe(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
 
   await act(async () => {
     requests[1].resolve({ rows: makeRows(2), totalCount: 12 });

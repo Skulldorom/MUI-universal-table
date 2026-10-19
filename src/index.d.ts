@@ -5,24 +5,18 @@ export interface TableRowData {
   [key: string]: unknown;
 }
 
-/** Query the table sends to `fetchRows` when it needs a server page. */
+/**
+ * First argument passed to `fetchRows`: the `filters` prop merged with the
+ * table's current query state. Must be JSON-serializable.
+ */
 export interface FetchRowsQuery {
-  /**
-   * The `filters` prop merged with the table's current query state:
-   * `page`, `searchTerm`, `column` and `direction` are added alongside your
-   * own filter keys. Must be JSON-serializable.
-   */
-  filters: {
-    /** Server page being requested (1-based). */
-    page: number;
-    searchTerm: string;
-    column: string;
-    direction: "asc" | "desc";
-    /** Pass-through of the `filters` prop (JSON-serializable values). */
-    [key: string]: unknown;
-  };
-  /** Aborted when the query is superseded or the table unmounts. */
-  signal: AbortSignal;
+  /** Server page being requested (1-based). */
+  page: number;
+  searchTerm: string;
+  column: string;
+  direction: "asc" | "desc";
+  /** Pass-through of the `filters` prop (JSON-serializable values). */
+  [key: string]: unknown;
 }
 
 export interface FetchRowsResult {
@@ -115,7 +109,10 @@ export interface UniversalTableFetchProps extends UniversalTableCommonProps {
    * reset changes, and the next page as the user reaches the end of the
    * rows loaded so far.
    */
-  fetchRows: (query: FetchRowsQuery) => Promise<FetchRowsResult>;
+  fetchRows: (
+    filters: FetchRowsQuery,
+    signal: AbortSignal,
+  ) => Promise<FetchRowsResult>;
   /**
    * Plain object of filter values merged into the `filters` query sent to
    * `fetchRows`. Compared by value, so it must be JSON-serializable; a change

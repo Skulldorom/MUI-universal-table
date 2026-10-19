@@ -10,7 +10,7 @@
 | `loading`          | `bool`    | `false`                   | Shows loading state                                                                                  |
 | `setLoading`       | `func`    | -                         | Called with `true` when the user clicks reload (legacy — prefer `onReload`). Not used in `fetchRows` mode |
 | `onReload`         | `func`    | -                         | Preferred reload callback — takes priority for reload-button clicks                                  |
-| `fetchRows`        | `func`    | -                         | Server-side pagination data source: `({ filters, signal }) => Promise<{ rows, totalCount? }>` where `filters` is your `filters` prop merged with `page`/`searchTerm`/`column`/`direction` — see [Async Usage](./async-usage) |
+| `fetchRows`        | `func`    | -                         | Server-side pagination data source: `(filters, signal) => Promise<{ rows, totalCount? }>` where `filters` is your `filters` prop merged with `page`/`searchTerm`/`column`/`direction` — see [Async Usage](./async-usage) |
 | `filters`          | `object`  | -                         | Plain JSON-serializable filter object merged into the `filters` query sent to `fetchRows`. Compared by value — a change resets to page 1 |
 | `reset`            | `any`     | -                         | Reset signal for `fetchRows` mode — change it (e.g. an incrementing counter) after external mutations to refetch from page 1 |
 | `onStateChange`    | `func`    | -                         | `fetchRows` mode only — called with the fetch state snapshot (`loading`, `loadingMore`, `error`, `hasMore`, `totalCount`, `loadedCount`) whenever it changes |

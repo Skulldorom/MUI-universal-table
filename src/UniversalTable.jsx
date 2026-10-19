@@ -273,7 +273,7 @@ UniversalTable.propTypes = {
   /**
    * Server-side pagination data source. When provided, the table owns the
    * rows state and calls this function whenever it needs a page:
-   * `(query: { filters, signal }) => Promise<{ rows: array, totalCount?: number }>`
+   * `(filters, signal) => Promise<{ rows: array, totalCount?: number }>`
    * where `filters` is the `filters` prop merged with the table's current
    * `page`, `searchTerm`, `column` and `direction`.
    * `totalCount` should be returned on page 1 (drives the footer and
