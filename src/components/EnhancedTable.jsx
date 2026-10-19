@@ -38,7 +38,6 @@ function EnhancedTable(props) {
     order,
     orderBy,
     async,
-    asyncPages,
     fetchState,
   } = props;
   const fetchMode = Boolean(fetchState);
@@ -60,15 +59,26 @@ function EnhancedTable(props) {
     setOrderBy,
     order,
     orderBy,
-    asyncPages,
   });
 
   const effectiveRowsPerPage = rowsPerPage === -1 ? rows.length : rowsPerPage;
+  const pageSize = Math.max(effectiveRowsPerPage, 1);
+
+  // In `fetchRows` mode the pager exposes only the loaded window plus, at
+  // most, one page of headroom when more data exists. The table can only ever
+  // append the next server page, so this keeps navigation sequential and
+  // prevents an unbounded fetch cascade from "jump to last". The real server
+  // total is shown separately via `labelDisplayedRows`.
+  const hasMore = fetchMode && Boolean(fetchState.hasMore);
+  const pagerCount = fetchMode
+    ? rows.length + (hasMore ? pageSize : 0)
+    : rows.length;
+  const pageCount = Math.max(1, Math.ceil(pagerCount / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
 
   const emptyRows = Math.max(
     0,
-    effectiveRowsPerPage -
-      Math.min(effectiveRowsPerPage, rows.length - page * effectiveRowsPerPage),
+    pageSize - Math.min(pageSize, rows.length - currentPage * pageSize),
   );
 
   const isSelected = React.useCallback(
@@ -77,16 +87,14 @@ function EnhancedTable(props) {
   );
 
   const visibleRows = React.useMemo(() => {
-    return stableSort(
-      rows,
-      getComparator(order, orderBy),
-      headers,
-      orderBy,
-    ).slice(
-      page * effectiveRowsPerPage,
-      page * effectiveRowsPerPage + effectiveRowsPerPage,
+    const ordered = fetchMode
+      ? rows
+      : stableSort(rows, getComparator(order, orderBy), headers, orderBy);
+    return ordered.slice(
+      currentPage * pageSize,
+      currentPage * pageSize + pageSize,
     );
-  }, [effectiveRowsPerPage, headers, order, orderBy, page, rows]);
+  }, [fetchMode, pageSize, headers, order, orderBy, currentPage, rows]);
 
   // Server pagination ("fetch rows" mode): when the visible window extends
   // past the rows loaded so far, pull in the next server page. The strict `>`
@@ -104,7 +112,7 @@ function EnhancedTable(props) {
     ) {
       return;
     }
-    if ((page + 1) * effectiveRowsPerPage > rows.length && rows.length > 0) {
+    if ((currentPage + 1) * pageSize > rows.length && rows.length > 0) {
       onLoadMore();
     }
   }, [
@@ -114,15 +122,15 @@ function EnhancedTable(props) {
     fetchState?.loadingMore,
     fetchState?.loadMoreError,
     fetchState?.hasMore,
-    page,
-    effectiveRowsPerPage,
+    currentPage,
+    pageSize,
     rows.length,
   ]);
 
   const columnCount = headers.length + (props.selectRows ? 1 : 0);
   const onLastLoadedPage =
     rows.length === 0 ||
-    (page + 1) * effectiveRowsPerPage >= rows.length;
+    (currentPage + 1) * pageSize >= rows.length;
   const showEndOfData =
     fetchMode &&
     !fetchState.hasMore &&
@@ -136,6 +144,14 @@ function EnhancedTable(props) {
     !fetchState?.loadingMore &&
     !fetchState?.loadMoreError &&
     !showEndOfData;
+
+  const serverTotal = fetchMode ? fetchState.totalCount : rows.length;
+  const labelDisplayedRows = ({ from, to }) => {
+    if (serverTotal === null || serverTotal === undefined) {
+      return `${from}–${to}${hasMore ? "+" : ""}`;
+    }
+    return `${from}–${to} of ${serverTotal}`;
+  };
 
   return (
     <TableContainer>
@@ -200,7 +216,7 @@ function EnhancedTable(props) {
               {visibleRows.map((row, index) => {
                 const rowKey = selectID
                   ? row[selectID]
-                  : `row-${page * effectiveRowsPerPage + index}`;
+                  : `row-${currentPage * pageSize + index}`;
                 const rowID = getSelectableRowId(row, index, selectID);
 
                 return (
@@ -270,11 +286,12 @@ function EnhancedTable(props) {
             props.pageSizeOptions || getPageOptions(rows.length)
           }
           component="div"
-          count={fetchMode ? (fetchState.totalCount ?? rows.length) : rows.length}
+          count={pagerCount}
           rowsPerPage={rowsPerPage}
-          page={page}
+          page={currentPage}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
+          labelDisplayedRows={labelDisplayedRows}
           sx={{ overflow: "visible" }}
           showFirstButton
           showLastButton
@@ -305,7 +322,6 @@ EnhancedTable.propTypes = {
   setOrderBy: PropTypes.func,
   order: PropTypes.string,
   orderBy: PropTypes.string,
-  asyncPages: PropTypes.number,
   fetchState: PropTypes.shape({
     totalCount: PropTypes.number,
     hasMore: PropTypes.bool,

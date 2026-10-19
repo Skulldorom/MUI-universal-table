@@ -19,7 +19,6 @@ export default function useEnhancedTableState({
   setOrderBy,
   order,
   orderBy,
-  asyncPages,
 }) {
   const [pagination, setPagination] = React.useState(() => ({
     page: 0,
@@ -74,7 +73,7 @@ export default function useEnhancedTableState({
   const handleSort = (column, apiSortable) => {
     if (apiSortable) {
       const direction = order === "asc" ? "desc" : "asc";
-      apiCall({ searchTerm, column, direction, pages: asyncPages ?? 1 });
+      apiCall({ searchTerm, column, direction });
       setOrder(direction);
       setOrderBy(column);
       return;

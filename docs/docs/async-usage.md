@@ -45,9 +45,14 @@ omit it.
 The table handles the rest:
 
 - **Initial load** fetches exactly page 1 (skeleton while in flight).
-- **Load more** fires automatically when the user paginates to the end of the
-  loaded rows, with an inline "loading more" indicator distinct from the
-  initial skeleton.
+- **Sequential pagination**: the footer exposes the loaded rows plus, at most,
+  one page of headroom. Clicking next/last requests the immediate next server
+  page, so navigation is one page at a time — there is no "jump to page 50"
+  (the table can only append). `totalCount` still drives the "1–25 of 4,321"
+  label; without it the label reads "1–25+" and the next button stays enabled
+  until a page comes back empty.
+- **Load more** fires automatically as the viewport reaches the loaded rows,
+  with an inline "loading more" indicator distinct from the initial skeleton.
 - **Search** (500 ms debounce), **sortable header clicks**, and the **reload
   button** reset to page 1, clear stale rows, and abort in-flight requests.
 - **Already-loaded pages are cached** — paging backwards costs no request.
@@ -77,8 +82,8 @@ const [filters, setFilters] = React.useState({ status: "", currency: "" });
 const applyFilters = () => setFilters(draftFilters);
 ```
 
-Inline objects are safe — `filters={{ status: "open" }}` will not cause
-refetch loops, because comparison is by value, not identity.
+Inline objects are safe — <span v-pre>`filters={{ status: "open" }}`</span> will
+not cause refetch loops, because comparison is by value, not identity.
 
 ## 3) Refresh after mutations (`reset` prop)
 
@@ -103,28 +108,90 @@ always register.
 
 `onReload` still takes priority for reload-button clicks, in every mode.
 
-## Migrating from `asyncPages` (deprecated)
+## 5) Parent access to the table state (optional)
 
-`asyncPages` keeps working, but it eagerly fetches N pages up front and
-paginates client-side over only those rows — rows beyond page N are silently
-unreachable. Migrate like so:
+In `fetchRows` mode the table owns its state. Two opt-in hooks let the parent
+observe it and drive it.
 
-```diff
-- const { loadingIndicator, currentPage, totalPages, loading, data, loadFiltered } =
--   usePagesLoading({ getData: getOrders, getPages: getOrderPages, getFilterData });
-+ const [filters, setFilters] = React.useState(initialFilters);
-+ const [reset, setReset] = React.useState(0);
+### Observe state — `onStateChange`
 
+`onStateChange` fires with a snapshot whenever the fetch state actually changes:
+
+```jsx
+const [tableState, setTableState] = React.useState(null);
+
+<>
+  <GlobalSpinner visible={tableState?.loading ?? true} />
   <UniversalTable
     headers={headers}
-    name="Orders"
+    name="Users"
+    fetchRows={fetchRows}
+    onStateChange={setTableState}
+  />
+</>
+```
+
+The snapshot is:
+
+```ts
+{
+  loading: boolean;       // full (re)load in progress
+  loadingMore: boolean;   // appending the next page
+  error: boolean;         // latest full load failed
+  hasMore: boolean;       // another page is available
+  totalCount: number | null;
+  loadedCount: number;    // rows currently loaded
+}
+```
+
+This is a one-way, read-only mirror — the table stays the source of truth.
+Don't feed the snapshot back in as props; use the commands below to influence
+the table. Store only the fields you need if re-renders matter.
+
+### Command the table — `reset` and `loadMoreSignal`
+
+Both commands are declarative: you change a prop and the table reacts.
+
+```jsx
+const [reset, setReset] = React.useState(0);
+const [loadMore, setLoadMore] = React.useState(0);
+
+<>
+  <button onClick={() => setReset((n) => n + 1)}>Refresh</button>
+  <button onClick={() => setLoadMore((n) => n + 1)}>Load more</button>
+  <UniversalTable
+    headers={headers}
+    name="Users"
+    fetchRows={fetchRows}
+    reset={reset}
+    loadMoreSignal={loadMore}
+  />
+</>
+```
+
+- `reset` — discard loaded rows and refetch from page 1 (also used after
+  external mutations).
+- `loadMoreSignal` — append the next server page. Bump it (an incrementing
+  counter, not a boolean) so repeated clicks always register. No-op while a
+  request is in flight or at end of data.
+
+Prefer `onStateChange` for reactive state; there is no imperative getter.
+
+## Upgrading from `asyncPages` (removed)
+
+The legacy `asyncPages` prop and its `setLoading` payload mode have been
+removed. It eagerly fetched N pages up front and paginated client-side over
+only those rows, so rows beyond page N were silently unreachable. Replace it
+with `fetchRows`:
+
+```diff
+- <UniversalTable
 -   data={data}
 -   loading={loading}
--   lazyloading={loadingIndicator}
--   currentPage={currentPage}
--   totalPages={totalPages}
 -   setLoading={loadFiltered}
 -   asyncPages={5}
+- />
++ <UniversalTable
 +   filters={filters}
 +   reset={reset}
 +   fetchRows={async ({ page, searchTerm, column, direction, filters, signal }) => {
@@ -135,10 +202,11 @@ unreachable. Migrate like so:
 +     }
 +     return { rows: await getOrders(query, signal) };
 +   }}
-  />
++ />
 ```
 
-- Advanced-search "apply" button → `setFilters(draft)`.
-- Post-mutation refresh → `setReset((v) => v + 1)`.
-- Client-side `setData(filtered)` shortcuts → delete; a reset now costs one
-  page request.
+- Search, sort and filters now flow through `fetchRows` automatically.
+- Post-mutation refresh → bump the `reset` prop.
+- Loading state you previously drove via `setLoading` → observe with
+  `onStateChange`; trigger actions with `reset` / `loadMoreSignal`.
+

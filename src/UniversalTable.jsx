@@ -1,8 +1,6 @@
-/* global process */
 import React from "react";
 import PropTypes from "prop-types";
 import Paper from "@mui/material/Paper";
-import LazyLoadingIndicator from "./components/LazyLoadingIndicator";
 import useSearchableRows from "./hooks/useSearchableRows";
 import useSelectableRows from "./hooks/useSelectableRows";
 import useFetchRowsState from "./hooks/useFetchRowsState";
@@ -11,35 +9,10 @@ import TableTitle from "./components/TableTitle";
 import TableToolbarContent from "./components/TableToolbarContent";
 import EnhancedTable from "./components/EnhancedTable";
 
-let asyncPagesDeprecationWarned = false;
-
-function warnAsyncPagesDeprecated() {
-  if (asyncPagesDeprecationWarned) {
-    return;
-  }
-  asyncPagesDeprecationWarned = true;
-  // Dev-only notice: guarded so browsers without `process` never crash and
-  // test/production builds never emit it.
-  if (
-    typeof process !== "undefined" &&
-    process.env &&
-    process.env.NODE_ENV === "development"
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      "UniversalTable: `asyncPages` is deprecated and will be removed in a future major release. " +
-        "Use `fetchRows` for true incremental server-side pagination instead.",
-    );
-  }
-}
-
 export default function UniversalTable({
   loading,
   setLoading,
   onReload,
-  lazyloading = false,
-  currentPage,
-  totalPages,
   data = [],
   headers,
   name,
@@ -52,24 +25,21 @@ export default function UniversalTable({
   onSelection,
   pageSizeOptions,
   persistSearch,
-  asyncPages,
   fetchRows,
   filters,
   reset,
+  onStateChange,
+  loadMoreSignal,
 }) {
   const debounceRef = React.useRef(null);
-  const hasLoadedInitialAsyncPageRef = React.useRef(false);
 
   const fetchMode = typeof fetchRows === "function";
-  const legacyAsync =
-    !fetchMode && typeof asyncPages === "number" && asyncPages > 0;
-  const async = fetchMode || legacyAsync;
 
   const head = headers || [];
   const { rows: searchableRows, searchTerm, setSearchTerm } = useSearchableRows(
     data,
     head,
-    async,
+    fetchMode,
   );
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("");
@@ -85,7 +55,7 @@ export default function UniversalTable({
   });
 
   const rows = fetchMode ? fetchState.rows : searchableRows;
-  const { resetQuery } = fetchState;
+  const { resetQuery, loadMore } = fetchState;
   const { selected, clearSelection, handleSelectAllClick, handleClick } =
     useSelectableRows({
       rows,
@@ -125,18 +95,6 @@ export default function UniversalTable({
       debounceRef.current = setTimeout(() => {
         fetchState.resetQuery({ searchTerm: searchValue });
       }, 500);
-    } else if (legacyAsync) {
-      setSearchTerm(searchValue);
-      clearTimeout(debounceRef.current);
-
-      debounceRef.current = setTimeout(() => {
-        setLoading({
-          searchTerm: searchValue,
-          direction: order,
-          column: orderBy,
-          pages: asyncPages,
-        });
-      }, 500);
     } else {
       handleSearchChange(searchValue);
     }
@@ -146,25 +104,50 @@ export default function UniversalTable({
     return () => clearTimeout(debounceRef.current);
   }, []);
 
+  // Stable snapshot of the internal fetch state, published to consumers via
+  // `onStateChange`.
+  const fetchSnapshot = React.useMemo(
+    () => ({
+      loading: fetchState.loading,
+      loadingMore: fetchState.loadingMore,
+      error: fetchState.error,
+      hasMore: fetchState.hasMore,
+      totalCount: fetchState.totalCount,
+      loadedCount: fetchState.rows.length,
+    }),
+    [
+      fetchState.loading,
+      fetchState.loadingMore,
+      fetchState.error,
+      fetchState.hasMore,
+      fetchState.totalCount,
+      fetchState.rows.length,
+    ],
+  );
+
+  // Observe: notify the consumer whenever the fetch state actually changes.
+  // Seeded with the initial snapshot so the mount render doesn't emit a
+  // spurious pre-fetch "idle" state.
+  const emittedStateRef = React.useRef(fetchSnapshot);
   React.useEffect(() => {
-    if (!legacyAsync || hasLoadedInitialAsyncPageRef.current) {
+    if (!fetchMode || emittedStateRef.current === fetchSnapshot) {
       return;
     }
+    emittedStateRef.current = fetchSnapshot;
+    onStateChange?.(fetchSnapshot);
+  }, [fetchMode, fetchSnapshot, onStateChange]);
 
-    hasLoadedInitialAsyncPageRef.current = true;
-    setLoading({
-      searchTerm,
-      direction: order,
-      column: orderBy,
-      pages: asyncPages,
-    });
-  }, [legacyAsync, asyncPages, order, orderBy, searchTerm, setLoading]);
-
+  // Command: bump `loadMoreSignal` (e.g. a counter) to append the next page.
+  // Declarative equivalent of an imperative `loadMore()`; reload is already
+  // covered by the `reset` prop.
+  const loadMoreSignalRef = React.useRef(loadMoreSignal);
   React.useEffect(() => {
-    if (legacyAsync) {
-      warnAsyncPagesDeprecated();
+    if (!fetchMode || Object.is(loadMoreSignalRef.current, loadMoreSignal)) {
+      return;
     }
-  }, [legacyAsync]);
+    loadMoreSignalRef.current = loadMoreSignal;
+    loadMore();
+  }, [fetchMode, loadMoreSignal, loadMore]);
 
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {
@@ -176,23 +159,9 @@ export default function UniversalTable({
       return;
     }
     if (typeof setLoading === "function") {
-      setLoading(
-        legacyAsync
-          ? { searchTerm, direction: order, column: orderBy, pages: asyncPages }
-          : true,
-      );
+      setLoading(true);
     }
-  }, [
-    fetchMode,
-    resetQuery,
-    legacyAsync,
-    onReload,
-    setLoading,
-    searchTerm,
-    order,
-    orderBy,
-    asyncPages,
-  ]);
+  }, [fetchMode, resetQuery, onReload, setLoading]);
 
   // Server-sort bridge: useEnhancedTableState calls its `apiCall` with a
   // payload object; in fetch mode only the column/direction matter.
@@ -205,11 +174,6 @@ export default function UniversalTable({
 
   return (
     <>
-      <LazyLoadingIndicator
-        show={lazyloading}
-        currentPage={currentPage}
-        totalPages={totalPages}
-      />
       <Paper
         sx={{
           ...(subTable && { boxShadow: "none" }),
@@ -257,8 +221,7 @@ export default function UniversalTable({
           orderBy={orderBy}
           setOrder={setOrder}
           setOrderBy={setOrderBy}
-          asyncPages={asyncPages}
-          async={async}
+          async={fetchMode}
           fetchState={
             fetchMode
               ? {
@@ -283,10 +246,7 @@ UniversalTable.propTypes = {
   setLoading: PropTypes.func,
   /** Preferred callback — fires when the user clicks reload. */
   onReload: PropTypes.func,
-  lazyloading: PropTypes.bool,
-  currentPage: PropTypes.number,
-  totalPages: PropTypes.number,
-  /** Required in sync/async modes; unused (and optional) in `fetchRows` mode. */
+  /** Required in sync mode; unused (and optional) in `fetchRows` mode. */
   data: PropTypes.array,
   headers: PropTypes.array.isRequired,
   name: PropTypes.string,
@@ -301,8 +261,6 @@ UniversalTable.propTypes = {
   pageSizeOptions: PropTypes.arrayOf(PropTypes.number),
   /** Persist search term to sessionStorage (requires name prop). Default: false */
   persistSearch: PropTypes.bool,
-  /** @deprecated Use `fetchRows` for true server-side pagination. */
-  asyncPages: PropTypes.number,
   /**
    * Server-side pagination data source. When provided, the table owns the
    * rows state and calls this function whenever it needs a page:
@@ -322,4 +280,16 @@ UniversalTable.propTypes = {
    * to make the table discard loaded rows and refetch from page 1.
    */
   reset: PropTypes.any,
+  /**
+   * `fetchRows` mode only. Called with the fetch state snapshot whenever it
+   * changes: `{ loading, loadingMore, error, hasMore, totalCount, loadedCount }`.
+   * Use it to drive parent-level UI (spinners, banners, counters).
+   */
+  onStateChange: PropTypes.func,
+  /**
+   * `fetchRows` mode only. Bump this value (e.g. an incrementing counter) to
+   * append the next server page — the declarative equivalent of a manual
+   * "Load more". Reload is covered by the `reset` prop.
+   */
+  loadMoreSignal: PropTypes.any,
 };

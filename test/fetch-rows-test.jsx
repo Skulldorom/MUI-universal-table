@@ -1,6 +1,6 @@
 import React from "react";
 import { jest } from "@jest/globals";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UniversalTable } from "../src/index.js";
 
@@ -126,11 +126,13 @@ test("does not fire duplicate requests while a page is in flight", async () => {
     requests[0].resolve({ rows: makeRows(1), totalCount: 20 });
   });
 
-  // Page 2 of the client pager → prefetch page 2 from the server
+  // Page 2 of the client pager → fetch page 2 from the server
   await user.click(screen.getByRole("button", { name: /next page/i }));
   expect(fetchRows).toHaveBeenCalledTimes(2);
-  // Page 3 while page-2 request is still pending → no extra call
-  await user.click(screen.getByRole("button", { name: /next page/i }));
+
+  // With only one page of headroom, "next" is disabled while the page is in
+  // flight → no duplicate request can be fired
+  expect(screen.getByRole("button", { name: /next page/i })).toBeDisabled();
   expect(fetchRows).toHaveBeenCalledTimes(2);
 
   await act(async () => {
@@ -188,6 +190,84 @@ test("a stale totalCount cannot spin into an endless fetch loop", async () => {
   // A zero-row page ends pagination regardless of totalCount
   expect(fetchRows).toHaveBeenCalledTimes(2);
   expect(screen.getByText("No more results")).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Pager reachability (unknown total) and no fetch cascade
+// ---------------------------------------------------------------------------
+
+test("without totalCount the next page stays reachable via pager headroom", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  render(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} />);
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1) }); // no totalCount
+  });
+
+  const next = screen.getByRole("button", { name: /next page/i });
+  expect(next).toBeEnabled();
+  await user.click(next);
+
+  expect(fetchRows).toHaveBeenCalledTimes(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
+
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(2) }); // still no totalCount
+  });
+  expect(screen.getByText("User 6")).toBeInTheDocument();
+  // Total is unknown → the label advertises "more"
+  expect(screen.getByText(/6–10\+/)).toBeInTheDocument();
+});
+
+test("jump to last loads only one additional page (no cascade)", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  render(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} />);
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 100 });
+  });
+
+  await user.click(screen.getByRole("button", { name: /last page/i }));
+
+  // Only the immediate next server page is requested, not the whole run
+  expect(fetchRows).toHaveBeenCalledTimes(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
+
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(2), totalCount: 100 });
+  });
+  expect(screen.getByText("User 6")).toBeInTheDocument();
+});
+
+test("fetch mode renders server order without client re-sorting", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  render(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} />);
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  // Server sort requested (descending), but the server returns ascending order
+  await user.click(screen.getByText("Name"));
+  await act(async () => {
+    requests[1].resolve({
+      rows: [
+        { name: "Adam", email: "a@x.com" },
+        { name: "Zoe", email: "z@x.com" },
+      ],
+      totalCount: 2,
+    });
+  });
+
+  const bodyRows = within(screen.getAllByRole("rowgroup")[1]).getAllByRole(
+    "row",
+  );
+  // Rendered in the order the server returned (Adam before Zoe), not re-sorted
+  expect(within(bodyRows[0]).getByText("Adam")).toBeInTheDocument();
+  expect(within(bodyRows[1]).getByText("Zoe")).toBeInTheDocument();
 });
 
 // ---------------------------------------------------------------------------
@@ -503,7 +583,197 @@ test("changing the reset signal discards loaded rows and refetches from page 1",
 });
 
 // ---------------------------------------------------------------------------
-// Mode isolation: sync and legacy asyncPages modes unaffected
+// onStateChange / loadMoreSignal
+// ---------------------------------------------------------------------------
+
+test("onStateChange publishes the fetch state snapshot as it changes", async () => {
+  const { fetchRows, requests } = mockFetchRows();
+  const onStateChange = jest.fn();
+  render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      onStateChange={onStateChange}
+    />,
+  );
+
+  expect(onStateChange).toHaveBeenLastCalledWith({
+    loading: true,
+    loadingMore: false,
+    error: false,
+    hasMore: false,
+    totalCount: null,
+    loadedCount: 0,
+  });
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  expect(onStateChange).toHaveBeenLastCalledWith({
+    loading: false,
+    loadingMore: false,
+    error: false,
+    hasMore: true,
+    totalCount: 12,
+    loadedCount: 5,
+  });
+});
+
+test("onStateChange reports loadingMore while appending a page", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  const onStateChange = jest.fn();
+  render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      onStateChange={onStateChange}
+    />,
+  );
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  await user.click(screen.getByRole("button", { name: /next page/i }));
+  expect(onStateChange).toHaveBeenLastCalledWith({
+    loading: false,
+    loadingMore: true,
+    error: false,
+    hasMore: true,
+    totalCount: 12,
+    loadedCount: 5,
+  });
+
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(2), totalCount: 12 });
+  });
+  expect(onStateChange).toHaveBeenLastCalledWith({
+    loading: false,
+    loadingMore: false,
+    error: false,
+    hasMore: true,
+    totalCount: 12,
+    loadedCount: 10,
+  });
+});
+
+test("onStateChange reports the error state on a failed full load", async () => {
+  const { fetchRows, requests } = mockFetchRows();
+  const onStateChange = jest.fn();
+  render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      onStateChange={onStateChange}
+    />,
+  );
+
+  await act(async () => {
+    requests[0].reject(new Error("boom"));
+  });
+
+  expect(onStateChange).toHaveBeenLastCalledWith({
+    loading: false,
+    loadingMore: false,
+    error: true,
+    hasMore: false,
+    totalCount: null,
+    loadedCount: 0,
+  });
+});
+
+test("onStateChange is never called in sync mode", async () => {
+  const onStateChange = jest.fn();
+  render(
+    <UniversalTable
+      headers={headers}
+      name="Sync"
+      data={[{ name: "Local", email: "l@x.com" }]}
+      loading={false}
+      onStateChange={onStateChange}
+    />,
+  );
+
+  await act(async () => {});
+  expect(onStateChange).not.toHaveBeenCalled();
+});
+
+test("bumping loadMoreSignal appends the next page", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  const { rerender } = render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      loadMoreSignal={0}
+    />,
+  );
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+  expect(fetchRows).toHaveBeenCalledTimes(1);
+
+  // Same value → no fetch
+  rerender(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      loadMoreSignal={0}
+    />,
+  );
+  expect(fetchRows).toHaveBeenCalledTimes(1);
+
+  // Bump → append the next server page
+  rerender(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      loadMoreSignal={1}
+    />,
+  );
+  expect(fetchRows).toHaveBeenCalledTimes(2);
+  expect(lastQuery(fetchRows).page).toBe(2);
+
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(2), totalCount: 12 });
+  });
+  // The appended page is now viewable without another request
+  await user.click(screen.getByRole("button", { name: /next page/i }));
+  expect(screen.getByText("User 6")).toBeInTheDocument();
+  expect(fetchRows).toHaveBeenCalledTimes(2);
+});
+
+test("loadMoreSignal is ignored in sync mode", async () => {
+  const setLoading = jest.fn();
+  const props = {
+    headers,
+    name: "Sync",
+    data: [{ name: "Local", email: "l@x.com" }],
+    loading: false,
+    setLoading,
+  };
+  const { rerender } = render(
+    <UniversalTable {...props} loadMoreSignal={0} />,
+  );
+  await act(async () => {});
+  rerender(<UniversalTable {...props} loadMoreSignal={1} />);
+  await act(async () => {});
+
+  expect(setLoading).not.toHaveBeenCalled();
+  expect(screen.getByText(/1–1 of 1/i)).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Mode isolation: sync mode unaffected
 // ---------------------------------------------------------------------------
 
 test("sync mode renders local data without triggering a data callback", () => {
@@ -519,33 +789,4 @@ test("sync mode renders local data without triggering a data callback", () => {
   );
   expect(setLoading).not.toHaveBeenCalled();
   expect(screen.getByText(/1–1 of 1/i)).toBeInTheDocument();
-});
-
-test("legacy asyncPages mode still dispatches the pages payload", () => {
-  jest.useFakeTimers();
-  // The deprecation notice is intentionally emitted in development builds.
-  const consoleWarn = jest.spyOn(console, "warn").mockImplementation(() => {});
-  try {
-    const setLoading = jest.fn();
-    render(
-      <UniversalTable
-        headers={headers}
-        name="Legacy"
-        data={[{ name: "Row", email: "r@x.com" }]}
-        loading={false}
-        setLoading={setLoading}
-        asyncPages={2}
-      />,
-    );
-
-    expect(setLoading).toHaveBeenCalledWith({
-      searchTerm: "",
-      direction: "asc",
-      column: "",
-      pages: 2,
-    });
-  } finally {
-    consoleWarn.mockRestore();
-    jest.useRealTimers();
-  }
 });
