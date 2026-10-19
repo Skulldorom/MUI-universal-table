@@ -24,6 +24,10 @@ import EnhancedTableHead from "./EnhancedTableHead";
 import DataRow from "./DataRow";
 import TableLoader from "./TableLoader";
 
+// In `fetchRows` mode the loaded row count is not the dataset size, so the
+// page-size options must not be derived from `rows.length`. Use a fixed set.
+const FETCH_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100];
+
 function EnhancedTable(props) {
   const {
     headers,
@@ -283,7 +287,8 @@ function EnhancedTable(props) {
       ) : (
         <TablePagination
           rowsPerPageOptions={
-            props.pageSizeOptions || getPageOptions(rows.length)
+            props.pageSizeOptions ||
+            (fetchMode ? FETCH_PAGE_SIZE_OPTIONS : getPageOptions(rows.length))
           }
           component="div"
           count={pagerCount}

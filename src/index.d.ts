@@ -7,13 +7,20 @@ export interface TableRowData {
 
 /** Query the table sends to `fetchRows` when it needs a server page. */
 export interface FetchRowsQuery {
-  /** Server page being requested (1-based). */
-  page: number;
-  searchTerm: string;
-  column: string;
-  direction: "asc" | "desc";
-  /** Pass-through of the `filters` prop. */
-  filters?: unknown;
+  /**
+   * The `filters` prop merged with the table's current query state:
+   * `page`, `searchTerm`, `column` and `direction` are added alongside your
+   * own filter keys. Must be JSON-serializable.
+   */
+  filters: {
+    /** Server page being requested (1-based). */
+    page: number;
+    searchTerm: string;
+    column: string;
+    direction: "asc" | "desc";
+    /** Pass-through of the `filters` prop (JSON-serializable values). */
+    [key: string]: unknown;
+  };
   /** Aborted when the query is superseded or the table unmounts. */
   signal: AbortSignal;
 }
@@ -110,10 +117,11 @@ export interface UniversalTableFetchProps extends UniversalTableCommonProps {
    */
   fetchRows: (query: FetchRowsQuery) => Promise<FetchRowsResult>;
   /**
-   * Opaque filter values passed through to `fetchRows`. Compared by value
-   * (must be JSON-serializable) — a change resets the table to page 1.
+   * Plain object of filter values merged into the `filters` query sent to
+   * `fetchRows`. Compared by value, so it must be JSON-serializable; a change
+   * resets the table to page 1.
    */
-  filters?: unknown;
+  filters?: Record<string, unknown>;
   /**
    * Opaque reset signal — change it (e.g. an incrementing counter) after
    * external mutations to make the table discard loaded rows and refetch

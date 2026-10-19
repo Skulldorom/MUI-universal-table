@@ -149,27 +149,36 @@ export default function UniversalTable({
     loadMore();
   }, [fetchMode, loadMoreSignal, loadMore]);
 
+  // Cancel any pending search debounce so a queued reset can't fire after
+  // (and supersede) a sort/reload performed in the meantime.
+  const cancelPendingSearch = React.useCallback(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
+
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {
       onReload();
       return;
     }
     if (fetchMode) {
+      cancelPendingSearch();
       resetQuery();
       return;
     }
     if (typeof setLoading === "function") {
       setLoading(true);
     }
-  }, [fetchMode, resetQuery, onReload, setLoading]);
+  }, [fetchMode, resetQuery, onReload, setLoading, cancelPendingSearch]);
 
   // Server-sort bridge: useEnhancedTableState calls its `apiCall` with a
   // payload object; in fetch mode only the column/direction matter.
   const handleFetchSort = React.useCallback(
     ({ column, direction }) => {
+      cancelPendingSearch();
       resetQuery({ column, direction });
     },
-    [resetQuery],
+    [resetQuery, cancelPendingSearch],
   );
 
   return (
@@ -264,17 +273,19 @@ UniversalTable.propTypes = {
   /**
    * Server-side pagination data source. When provided, the table owns the
    * rows state and calls this function whenever it needs a page:
-   * `(query: { page, searchTerm, column, direction, filters, signal }) =>
-   *   Promise<{ rows: array, totalCount?: number }>`
+   * `(query: { filters, signal }) => Promise<{ rows: array, totalCount?: number }>`
+   * where `filters` is the `filters` prop merged with the table's current
+   * `page`, `searchTerm`, `column` and `direction`.
    * `totalCount` should be returned on page 1 (drives the footer and
    * end-of-data detection); later pages may omit it.
    */
   fetchRows: PropTypes.func,
   /**
-   * Opaque consumer filter values passed through to `fetchRows`. Compared by
-   * value (must be JSON-serializable) — changing it resets to page 1.
+   * Plain, JSON-serializable filter object. Merged with the table's
+   * pagination/search/sort state and passed through to `fetchRows`. Compared
+   * by value — changing it resets to page 1.
    */
-  filters: PropTypes.any,
+  filters: PropTypes.object,
   /**
    * Opaque reset signal — bump it (e.g. a counter) after external mutations
    * to make the table discard loaded rows and refetch from page 1.

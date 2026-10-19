@@ -107,42 +107,51 @@ export default function useFetchRowsState({
     };
   });
 
-  const runFetch = React.useCallback((page, { append, newGeneration }) => {
-    const current = latestRef.current;
-    if (!current.enabled || typeof current.fetchRows !== "function") {
-      return;
-    }
+  const runFetch = React.useCallback(
+    async (page, { append, newGeneration }) => {
+      const current = latestRef.current;
+      if (!current.enabled || typeof current.fetchRows !== "function") {
+        return;
+      }
 
-    if (newGeneration) {
-      generationRef.current += 1;
-      controllerRef.current?.abort();
-      controllerRef.current = new AbortController();
-    }
-    const generation = generationRef.current;
-    const signal = controllerRef.current
-      ? controllerRef.current.signal
-      : undefined;
+      if (newGeneration) {
+        generationRef.current += 1;
+        controllerRef.current?.abort();
+        controllerRef.current = new AbortController();
+      }
+      const generation = generationRef.current;
+      const signal = controllerRef.current
+        ? controllerRef.current.signal
+        : undefined;
 
-    setState((previous) =>
-      append
-        ? { ...previous, loadingMore: true, loadMoreError: false }
-        : {
-            ...initialState,
-            loading: true,
-            queryVersion: previous.queryVersion + 1,
+      setState((previous) =>
+        append
+          ? { ...previous, loadingMore: true, loadMoreError: false }
+          : {
+              ...initialState,
+              loading: true,
+              queryVersion: previous.queryVersion + 1,
+            },
+      );
+
+      const consumerFilters =
+        current.filters !== null &&
+        typeof current.filters === "object" &&
+        !Array.isArray(current.filters)
+          ? current.filters
+          : {};
+
+      try {
+        const result = await current.fetchRows({
+          filters: {
+            ...consumerFilters,
+            page,
+            searchTerm: current.searchTerm,
+            column: current.column,
+            direction: current.direction,
           },
-    );
-
-    current
-      .fetchRows({
-        page,
-        searchTerm: current.searchTerm,
-        column: current.column,
-        direction: current.direction,
-        filters: current.filters,
-        signal,
-      })
-      .then((result) => {
+          signal,
+        });
         if (generation !== generationRef.current) {
           return;
         }
@@ -159,8 +168,7 @@ export default function useFetchRowsState({
           loading: false,
           loadingMore: false,
         }));
-      })
-      .catch(() => {
+      } catch {
         if (generation !== generationRef.current) {
           return;
         }
@@ -170,8 +178,10 @@ export default function useFetchRowsState({
           loadingMore: false,
           ...(append ? { loadMoreError: true } : { error: true }),
         }));
-      });
-  }, []);
+      }
+    },
+    [],
+  );
 
   const resetQuery = React.useCallback(
     (overrides) => {

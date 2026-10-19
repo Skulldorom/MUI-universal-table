@@ -11,15 +11,15 @@ server total.
 <UniversalTable
   headers={headers}
   name="Users"
-  fetchRows={async ({ page, searchTerm, column, direction, signal }) => {
-    if (page === 1) {
+  fetchRows={async ({ filters, signal }) => {
+    if (filters.page === 1) {
       const [rows, count] = await Promise.all([
-        api.getUsers({ page, searchTerm, column, direction }, signal),
-        api.getUserCount({ searchTerm }),
+        api.getUsers(filters, signal),
+        api.getUserCount(filters),
       ]);
       return { rows, totalCount: count };
     }
-    const rows = await api.getUsers({ page, searchTerm, column, direction }, signal);
+    const rows = await api.getUsers(filters, signal);
     return { rows };
   }}
 />
@@ -29,11 +29,13 @@ The query object the table passes to `fetchRows`:
 
 ```ts
 {
-  page: number;                    // server page requested (1-based)
-  searchTerm: string;
-  column: string;
-  direction: "asc" | "desc";
-  filters?: unknown;               // pass-through of the `filters` prop
+  filters: {
+    page: number;                  // server page requested (1-based)
+    searchTerm: string;
+    column: string;
+    direction: "asc" | "desc";
+    ...yourFilters;                // spread of the `filters` prop
+  };
   signal: AbortSignal;             // aborted when the query is superseded
 }
 ```
@@ -55,6 +57,8 @@ The table handles the rest:
   with an inline "loading more" indicator distinct from the initial skeleton.
 - **Search** (500 ms debounce), **sortable header clicks**, and the **reload
   button** reset to page 1, clear stale rows, and abort in-flight requests.
+  Only columns marked `sortable: true` are sortable in this mode; every other
+  header is disabled (the server owns the ordering).
 - **Already-loaded pages are cached** — paging backwards costs no request.
 - **Failures** show a retry control; a failed next-page fetch keeps all
   previously loaded rows.
@@ -62,8 +66,10 @@ The table handles the rest:
 ## 2) External filters (`filters` prop)
 
 Pass domain-specific filter values (advanced search panels, dropdowns…) via
-the `filters` prop. The table compares it **by value** (it must be
-JSON-serializable) and resets to page 1 whenever it changes:
+the `filters` prop. It must be a plain, JSON-serializable object. The table
+compares it **by value** and resets to page 1 whenever it changes. The table's
+own `page`, `searchTerm`, `column` and `direction` are merged into it for you,
+so just forward the whole object:
 
 ```jsx
 const [filters, setFilters] = React.useState({ status: "", currency: "" });
@@ -72,8 +78,8 @@ const [filters, setFilters] = React.useState({ status: "", currency: "" });
   headers={headers}
   name="Orders"
   filters={filters}
-  fetchRows={async ({ page, filters, signal }) => {
-    const rows = await api.getOrders({ page, ...filters }, signal);
+  fetchRows={async ({ filters: query, signal }) => {
+    const rows = await api.getOrders(query, signal);
     return { rows };
   }}
 />
@@ -84,6 +90,8 @@ const applyFilters = () => setFilters(draftFilters);
 
 Inline objects are safe — <span v-pre>`filters={{ status: "open" }}`</span> will
 not cause refetch loops, because comparison is by value, not identity.
+Unserializable `filters` values are unsupported and ignored for change
+detection.
 
 ## 3) Refresh after mutations (`reset` prop)
 
@@ -194,10 +202,12 @@ with `fetchRows`:
 + <UniversalTable
 +   filters={filters}
 +   reset={reset}
-+   fetchRows={async ({ page, searchTerm, column, direction, filters, signal }) => {
-+     const query = { ...filters, searchTerm, column, direction, currentPage: page };
-+     if (page === 1) {
-+       const [rows, pages] = await Promise.all([getOrders(query, signal), getOrderPages(query)]);
++   fetchRows={async ({ filters: query, signal }) => {
++     if (query.page === 1) {
++       const [rows, pages] = await Promise.all([
++         getOrders(query, signal),
++         getOrderPages(query),
++       ]);
 +       return { rows, totalCount: pages.filterCount * PAGE_SIZE };
 +     }
 +     return { rows: await getOrders(query, signal) };

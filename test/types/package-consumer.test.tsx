@@ -37,10 +37,11 @@ const syncProps: UniversalTableProps = {
 };
 
 const fetchRows = async (query: FetchRowsQuery): Promise<FetchRowsResult> => {
-  query.page.toFixed();
-  query.searchTerm.toUpperCase();
-  query.column.toUpperCase();
-  query.direction.toUpperCase();
+  query.filters.page.toFixed();
+  query.filters.searchTerm.toUpperCase();
+  query.filters.column.toUpperCase();
+  query.filters.direction.toUpperCase();
+  String(query.filters.status);
   query.signal.aborted.valueOf();
   return { rows, totalCount: rows.length };
 };
