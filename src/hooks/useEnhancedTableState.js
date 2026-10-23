@@ -1,11 +1,9 @@
 import React from "react";
+import { getInitialPageSize } from "../utils/tableUtils";
 
 function getInitialRowsPerPage({ rows, subTable, pageSizeOptions }) {
   if (subTable) return rows.length;
-  if (Array.isArray(pageSizeOptions) && pageSizeOptions.length > 0) {
-    return pageSizeOptions[0];
-  }
-  return 5;
+  return getInitialPageSize(pageSizeOptions);
 }
 
 export default function useEnhancedTableState({
@@ -19,7 +17,7 @@ export default function useEnhancedTableState({
   setOrderBy,
   order,
   orderBy,
-  asyncPages,
+  onRowsPerPageChange,
 }) {
   const [pagination, setPagination] = React.useState(() => ({
     page: 0,
@@ -63,18 +61,23 @@ export default function useEnhancedTableState({
     }));
   }, []);
 
-  const handleChangeRowsPerPage = React.useCallback((event) => {
-    setPagination((previous) => ({
-      ...previous,
-      page: 0,
-      rowsPerPage: Number.parseInt(event.target.value, 10),
-    }));
-  }, []);
+  const handleChangeRowsPerPage = React.useCallback(
+    (event) => {
+      const nextRowsPerPage = Number.parseInt(event.target.value, 10);
+      setPagination((previous) => ({
+        ...previous,
+        page: 0,
+        rowsPerPage: nextRowsPerPage,
+      }));
+      onRowsPerPageChange?.(nextRowsPerPage);
+    },
+    [onRowsPerPageChange],
+  );
 
   const handleSort = (column, apiSortable) => {
     if (apiSortable) {
       const direction = order === "asc" ? "desc" : "asc";
-      apiCall({ searchTerm, column, direction, pages: asyncPages ?? 1 });
+      apiCall({ searchTerm, column, direction });
       setOrder(direction);
       setOrderBy(column);
       return;
