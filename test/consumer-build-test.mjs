@@ -1,14 +1,36 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const root = process.cwd();
-// On Windows, npm/npx are .cmd shims, which require a shell to spawn (CVE-2024-27980).
-const onWindows = process.platform === "win32";
-const npmCommand = onWindows ? "npm.cmd" : "npm";
-const npxCommand = onWindows ? "npx.cmd" : "npx";
-const shellOption = onWindows;
+// Resolve npm's JS entrypoint and run it with the current Node binary. This
+// avoids spawning npm.cmd/npx.cmd through a shell on Windows (which triggers
+// Node's DEP0190 warning and shell-quoting hazards).
+const npmCliPath =
+  process.env.npm_execpath ||
+  [
+    join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+    join(
+      dirname(process.execPath),
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+  ].find((candidate) => existsSync(candidate));
+
+if (!npmCliPath) {
+  throw new Error("Could not locate npm-cli.js; run this test via an npm script.");
+}
+
+function runNpm(args, options) {
+  return execFileSync(process.execPath, [npmCliPath, ...args], options);
+}
+
 const workspace = await mkdtemp(join(tmpdir(), "mui-universal-table-consumer-"));
 const sourceDirectory = join(workspace, "src");
 
@@ -51,16 +73,15 @@ try {
     'import React from "react";\nimport { createRoot } from "react-dom/client";\nimport { UniversalTable } from "mui-universal-table";\n\ncreateRoot(document.getElementById("root")).render(\n  <UniversalTable data={[]} headers={[]} name="Consumer smoke test" loading={false} />,\n);\n',
   );
 
-  const packageOutput = execFileSync(
-    npmCommand,
+  const packageOutput = runNpm(
     [
       "pack",
       "--json",
       "--ignore-scripts",
       "--pack-destination",
-      shellOption ? `"${workspace}"` : workspace,
+      workspace,
     ],
-    { cwd: root, encoding: "utf8", shell: shellOption },
+    { cwd: root, encoding: "utf8" },
   );
   const packageResult = JSON.parse(packageOutput);
   const packageInfo = Array.isArray(packageResult)
@@ -73,10 +94,9 @@ try {
     workspace,
   ]);
 
-  execFileSync(npmCommand, ["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
+  runNpm(["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
     cwd: workspace,
     stdio: "inherit",
-    shell: shellOption,
   });
   execFileSync(
     process.execPath,
@@ -103,11 +123,18 @@ console.log("Packed package production runtime execution passed.");
     ],
     { cwd: workspace, env: { ...process.env, NODE_ENV: "production" }, stdio: "inherit" },
   );
-  execFileSync(npxCommand, ["vite", "build"], {
-    cwd: workspace,
-    stdio: "inherit",
-    shell: shellOption,
-  });
+  const vitePackage = JSON.parse(
+    await readFile(join(workspace, "node_modules", "vite", "package.json"), "utf8"),
+  );
+  const viteBin =
+    typeof vitePackage.bin === "string"
+      ? vitePackage.bin
+      : vitePackage.bin.vite;
+  execFileSync(
+    process.execPath,
+    [join(workspace, "node_modules", "vite", viteBin), "build"],
+    { cwd: workspace, stdio: "inherit" },
+  );
 
   const assetsDirectory = join(workspace, "dist", "assets");
   for (const asset of await readdir(assetsDirectory)) {

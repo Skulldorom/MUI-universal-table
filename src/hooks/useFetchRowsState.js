@@ -68,6 +68,12 @@ function computeHasMore(state) {
  *   external `filters` / `reset` prop changes.
  * - `loadMore()` — appends the next server page. Guarded against concurrent
  *   calls and end-of-data; safe to call repeatedly (e.g. as a retry).
+ * - `changePageSize(pageSize)` — new page size: resets to page 1 and refetches
+ *   with the new `pageSize` query value.
+ *
+ * `onExternalReset` runs synchronously before an external `filters` / `reset`
+ * change restarts the query, so callers can cancel queued work (e.g. a pending
+ * search debounce) and drop state tied to the old dataset (e.g. selection).
  */
 export default function useFetchRowsState({
   enabled,
@@ -77,8 +83,11 @@ export default function useFetchRowsState({
   searchTerm,
   column,
   direction,
+  onExternalReset,
+  initialPageSize = 5,
 }) {
   const [state, setState] = React.useState(initialState);
+  const [pageSize, setPageSize] = React.useState(initialPageSize);
 
   const stateRef = React.useRef(state);
   const generationRef = React.useRef(0);
@@ -90,6 +99,7 @@ export default function useFetchRowsState({
     searchTerm,
     column,
     direction,
+    pageSize,
   });
 
   React.useEffect(() => {
@@ -104,6 +114,7 @@ export default function useFetchRowsState({
       searchTerm,
       column,
       direction,
+      pageSize,
     };
   });
 
@@ -146,6 +157,7 @@ export default function useFetchRowsState({
           {
             ...consumerFilters,
             page,
+            pageSize: current.pageSize,
             searchTerm: current.searchTerm,
             column: current.column,
             direction: current.direction,
@@ -207,6 +219,22 @@ export default function useFetchRowsState({
     runFetch(current.lastPage + 1, { append: true, newGeneration: false });
   }, [runFetch]);
 
+  const changePageSize = React.useCallback(
+    (nextPageSize) => {
+      if (
+        typeof nextPageSize !== "number" ||
+        !Number.isFinite(nextPageSize) ||
+        nextPageSize <= 0 ||
+        nextPageSize === latestRef.current.pageSize
+      ) {
+        return;
+      }
+      setPageSize(nextPageSize);
+      resetQuery({ pageSize: nextPageSize });
+    },
+    [resetQuery],
+  );
+
   // Initial load.
   React.useEffect(() => {
     resetQuery();
@@ -231,8 +259,9 @@ export default function useFetchRowsState({
     ) {
       return;
     }
+    onExternalReset?.();
     resetQuery();
-  }, [filtersSerialized, resetSerialized, resetQuery]);
+  }, [filtersSerialized, resetSerialized, resetQuery, onExternalReset]);
 
   // Drop late responses and abort in-flight requests on unmount.
   React.useEffect(() => {
@@ -253,7 +282,9 @@ export default function useFetchRowsState({
     error: state.error,
     loadMoreError: state.loadMoreError,
     queryVersion: state.queryVersion,
+    pageSize,
     resetQuery,
     loadMore,
+    changePageSize,
   };
 }

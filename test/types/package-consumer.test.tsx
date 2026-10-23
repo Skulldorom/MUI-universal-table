@@ -41,6 +41,7 @@ const fetchRows = async (
   signal: AbortSignal,
 ): Promise<FetchRowsResult> => {
   filters.page.toFixed();
+  filters.pageSize.toFixed();
   filters.searchTerm.toUpperCase();
   filters.column.toUpperCase();
   filters.direction.toUpperCase();
@@ -52,6 +53,7 @@ const fetchRows = async (
 const handleStateChange = (state: FetchRowsState) => {
   state.loading.valueOf();
   state.loadingMore.valueOf();
+  state.loadMoreError.valueOf();
   state.error.valueOf();
   state.hasMore.valueOf();
   state.loadedCount.toFixed();

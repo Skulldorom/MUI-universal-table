@@ -63,6 +63,7 @@ function EnhancedTable(props) {
     setOrderBy,
     order,
     orderBy,
+    onRowsPerPageChange: fetchState?.onPageSizeChange,
   });
 
   const effectiveRowsPerPage = rowsPerPage === -1 ? rows.length : rowsPerPage;
@@ -80,9 +81,10 @@ function EnhancedTable(props) {
   const pageCount = Math.max(1, Math.ceil(pagerCount / pageSize));
   const currentPage = Math.min(page, pageCount - 1);
 
+  const loadedRowsOnPage = Math.max(0, rows.length - currentPage * pageSize);
   const emptyRows = Math.max(
     0,
-    pageSize - Math.min(pageSize, rows.length - currentPage * pageSize),
+    pageSize - Math.min(pageSize, loadedRowsOnPage),
   );
 
   const isSelected = React.useCallback(
@@ -135,6 +137,10 @@ function EnhancedTable(props) {
   const onLastLoadedPage =
     rows.length === 0 ||
     (currentPage + 1) * pageSize >= rows.length;
+  const showLoadingMoreRow =
+    fetchMode && fetchState.loadingMore && onLastLoadedPage;
+  const showLoadMoreErrorRow =
+    fetchMode && fetchState.loadMoreError && onLastLoadedPage;
   const showEndOfData =
     fetchMode &&
     !fetchState.hasMore &&
@@ -145,8 +151,8 @@ function EnhancedTable(props) {
   const showEmptyFiller =
     !subTable &&
     emptyRows > 0 &&
-    !fetchState?.loadingMore &&
-    !fetchState?.loadMoreError &&
+    !showLoadingMoreRow &&
+    !showLoadMoreErrorRow &&
     !showEndOfData;
 
   const serverTotal = fetchMode ? fetchState.totalCount : rows.length;
@@ -236,14 +242,14 @@ function EnhancedTable(props) {
                   />
                 );
               })}
-              {fetchMode && fetchState.loadingMore && (
+              {showLoadingMoreRow && (
                 <TableRow>
                   <TableCell colSpan={columnCount}>
                     <Skeleton height={30} />
                   </TableCell>
                 </TableRow>
               )}
-              {fetchMode && fetchState.loadMoreError && (
+              {showLoadMoreErrorRow && (
                 <TableRow>
                   <TableCell colSpan={columnCount} align="center">
                     <Stack
@@ -335,6 +341,7 @@ EnhancedTable.propTypes = {
     error: PropTypes.bool,
     onLoadMore: PropTypes.func,
     onRetry: PropTypes.func,
+    onPageSizeChange: PropTypes.func,
   }),
 };
 

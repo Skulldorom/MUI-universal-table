@@ -58,6 +58,7 @@ test("initial load issues exactly one page-1 request and renders rows + server t
   expect(fetchRows).toHaveBeenCalledTimes(1);
   const query = fetchRows.mock.calls[0][0];
   expect(query.page).toBe(1);
+  expect(query.pageSize).toBe(5);
   expect(query.searchTerm).toBe("");
   expect(query.column).toBe("");
   expect(query.direction).toBe("asc");
@@ -76,6 +77,52 @@ test("initial load issues exactly one page-1 request and renders rows + server t
   expect(screen.getByText(/1–5 of 12/i)).toBeInTheDocument();
   // Still exactly one request — no eager fetching of further pages
   expect(fetchRows).toHaveBeenCalledTimes(1);
+});
+
+test("initial request uses the first pageSizeOptions value", () => {
+  const { fetchRows } = mockFetchRows();
+  render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      pageSizeOptions={[10, 25]}
+    />,
+  );
+
+  expect(fetchRows).toHaveBeenCalledTimes(1);
+  expect(fetchRows.mock.calls[0][0].pageSize).toBe(10);
+});
+
+test("changing rows per page resets to page 1 with the new pageSize", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  render(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} />);
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+  expect(screen.getByText("User 1")).toBeInTheDocument();
+
+  const comboBox = screen.getByRole("combobox");
+  await user.click(comboBox);
+  await user.click(screen.getByRole("option", { name: "10" }));
+
+  expect(fetchRows).toHaveBeenCalledTimes(2);
+  const query = lastQuery(fetchRows);
+  expect(query.page).toBe(1);
+  expect(query.pageSize).toBe(10);
+  // The reset discards the previously loaded rows
+  expect(screen.queryByText("User 1")).not.toBeInTheDocument();
+
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(1, 10), totalCount: 12 });
+  });
+
+  // Later pages keep using the new size
+  await user.click(screen.getByRole("button", { name: /next page/i }));
+  expect(fetchRows).toHaveBeenCalledTimes(3);
+  expect(lastQuery(fetchRows)).toMatchObject({ page: 2, pageSize: 10 });
 });
 
 // ---------------------------------------------------------------------------
@@ -463,6 +510,40 @@ test("failed next-page fetch keeps loaded rows and can be retried", async () => 
   expect(screen.queryByText(/couldn.?t load more results/i)).not.toBeInTheDocument();
 });
 
+test("append error only renders on the last loaded page", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  render(<UniversalTable headers={headers} name="Users" fetchRows={fetchRows} />);
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  // Load a second page so there is an earlier page to navigate back to
+  await user.click(screen.getByRole("button", { name: /next page/i }));
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(2), totalCount: 12 });
+  });
+
+  // Fail the third page
+  await user.click(screen.getByRole("button", { name: /next page/i }));
+  await act(async () => {
+    requests[2].reject(new Error("network down"));
+  });
+  expect(screen.getByText(/couldn.?t load more results/i)).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: /previous page/i }));
+  expect(screen.getByText(/couldn.?t load more results/i)).toBeInTheDocument();
+
+  // An earlier page must not show the append error
+  await user.click(screen.getByRole("button", { name: /previous page/i }));
+  expect(screen.getByText("User 1")).toBeInTheDocument();
+  expect(
+    screen.queryByText(/couldn.?t load more results/i),
+  ).not.toBeInTheDocument();
+  expect(fetchRows).toHaveBeenCalledTimes(3);
+});
+
 // ---------------------------------------------------------------------------
 // Failed initial load: error state + retry
 // ---------------------------------------------------------------------------
@@ -583,6 +664,137 @@ test("changing the reset signal discards loaded rows and refetches from page 1",
 });
 
 // ---------------------------------------------------------------------------
+// Selection reset on external query changes
+// ---------------------------------------------------------------------------
+
+test("changing the filters prop clears the current row selection", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  const { rerender } = render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      filters={{ status: "open" }}
+      selectRows
+      selectID="name"
+    />,
+  );
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  await user.click(screen.getAllByRole("checkbox")[0]);
+  expect(screen.getByText("5 selected")).toBeInTheDocument();
+
+  rerender(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      filters={{ status: "closed" }}
+      selectRows
+      selectID="name"
+    />,
+  );
+
+  expect(screen.queryByText("5 selected")).not.toBeInTheDocument();
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+});
+
+test("changing the reset signal clears the current row selection", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  const { rerender } = render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      reset={0}
+      selectRows
+      selectID="name"
+    />,
+  );
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  await user.click(screen.getAllByRole("checkbox")[0]);
+  expect(screen.getByText("5 selected")).toBeInTheDocument();
+
+  rerender(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      reset={1}
+      selectRows
+      selectID="name"
+    />,
+  );
+
+  expect(screen.queryByText("5 selected")).not.toBeInTheDocument();
+  await act(async () => {
+    requests[1].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+});
+
+test("an external filters change cancels a pending search debounce", async () => {
+  jest.useFakeTimers();
+  try {
+    const { fetchRows, requests } = mockFetchRows();
+    const { rerender } = render(
+      <UniversalTable
+        headers={headers}
+        name="Users"
+        fetchRows={fetchRows}
+        filters={{ status: "open" }}
+      />,
+    );
+
+    await act(async () => {
+      requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+    });
+
+    const searchInput = screen.getByPlaceholderText("Search");
+    fireEvent.change(searchInput, { target: { value: "Jane" } });
+    expect(fetchRows).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <UniversalTable
+        headers={headers}
+        name="Users"
+        fetchRows={fetchRows}
+        filters={{ status: "closed" }}
+      />,
+    );
+
+    expect(fetchRows).toHaveBeenCalledTimes(2);
+    expect(lastQuery(fetchRows)).toMatchObject({
+      page: 1,
+      searchTerm: "Jane",
+      status: "closed",
+    });
+
+    // The queued debounce must not fire a third request
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(fetchRows).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      requests[1].resolve({ rows: [], totalCount: 0 });
+    });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // onStateChange / loadMoreSignal
 // ---------------------------------------------------------------------------
 
@@ -601,6 +813,7 @@ test("onStateChange publishes the fetch state snapshot as it changes", async () 
   expect(onStateChange).toHaveBeenLastCalledWith({
     loading: true,
     loadingMore: false,
+    loadMoreError: false,
     error: false,
     hasMore: false,
     totalCount: null,
@@ -614,6 +827,7 @@ test("onStateChange publishes the fetch state snapshot as it changes", async () 
   expect(onStateChange).toHaveBeenLastCalledWith({
     loading: false,
     loadingMore: false,
+    loadMoreError: false,
     error: false,
     hasMore: true,
     totalCount: 12,
@@ -642,6 +856,7 @@ test("onStateChange reports loadingMore while appending a page", async () => {
   expect(onStateChange).toHaveBeenLastCalledWith({
     loading: false,
     loadingMore: true,
+    loadMoreError: false,
     error: false,
     hasMore: true,
     totalCount: 12,
@@ -654,6 +869,7 @@ test("onStateChange reports loadingMore while appending a page", async () => {
   expect(onStateChange).toHaveBeenLastCalledWith({
     loading: false,
     loadingMore: false,
+    loadMoreError: false,
     error: false,
     hasMore: true,
     totalCount: 12,
@@ -680,10 +896,44 @@ test("onStateChange reports the error state on a failed full load", async () => 
   expect(onStateChange).toHaveBeenLastCalledWith({
     loading: false,
     loadingMore: false,
+    loadMoreError: false,
     error: true,
     hasMore: false,
     totalCount: null,
     loadedCount: 0,
+  });
+});
+
+test("onStateChange reports loadMoreError on a failed append", async () => {
+  const user = userEvent.setup();
+  const { fetchRows, requests } = mockFetchRows();
+  const onStateChange = jest.fn();
+  render(
+    <UniversalTable
+      headers={headers}
+      name="Users"
+      fetchRows={fetchRows}
+      onStateChange={onStateChange}
+    />,
+  );
+
+  await act(async () => {
+    requests[0].resolve({ rows: makeRows(1), totalCount: 12 });
+  });
+
+  await user.click(screen.getByRole("button", { name: /next page/i }));
+  await act(async () => {
+    requests[1].reject(new Error("network down"));
+  });
+
+  expect(onStateChange).toHaveBeenLastCalledWith({
+    loading: false,
+    loadingMore: false,
+    loadMoreError: true,
+    error: false,
+    hasMore: true,
+    totalCount: 12,
+    loadedCount: 5,
   });
 });
 

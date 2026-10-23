@@ -12,6 +12,8 @@ export interface TableRowData {
 export interface FetchRowsQuery {
   /** Server page being requested (1-based). */
   page: number;
+  /** Rows requested for this page (the table's current rows-per-page). */
+  pageSize: number;
   searchTerm: string;
   column: string;
   direction: "asc" | "desc";
@@ -34,6 +36,8 @@ export interface FetchRowsState {
   loading: boolean;
   /** The next server page is being appended in the background. */
   loadingMore: boolean;
+  /** The latest next-page (append) request failed. */
+  loadMoreError: boolean;
   /** The latest full (re)load failed. */
   error: boolean;
   /** Whether another server page is available. */

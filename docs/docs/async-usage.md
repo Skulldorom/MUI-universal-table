@@ -34,6 +34,7 @@ fetchRows(filters, signal);
 // filters:
 {
   page: number;                  // server page requested (1-based)
+  pageSize: number;              // rows requested (current rows-per-page)
   searchTerm: string;
   column: string;
   direction: "asc" | "desc";
@@ -43,21 +44,25 @@ fetchRows(filters, signal);
 // signal: AbortSignal — aborted when the query is superseded
 ```
 
-Return `{ rows, totalCount }`. Provide `totalCount` on page 1 — it drives the
-pagination footer ("1–25 of 4,321") and end-of-data detection. Later pages may
-omit it.
+Return `{ rows, totalCount }`. Return at most `pageSize` rows for the requested
+page. Provide `totalCount` on page 1 — it drives the pagination footer
+("1–25 of 4,321") and end-of-data detection. Later pages may omit it.
 
 The table handles the rest:
 
-- **Initial load** fetches exactly page 1 (skeleton while in flight).
+- **Initial load** fetches exactly page 1 (skeleton while in flight) with the
+  current `pageSize`.
+- **Rows per page** controls `pageSize`. Changing it resets to page 1 and
+  refetches, so the server always knows how many rows the table expects.
 - **Sequential pagination**: the footer exposes the loaded rows plus, at most,
   one page of headroom. Clicking next/last requests the immediate next server
   page, so navigation is one page at a time — there is no "jump to page 50"
   (the table can only append). `totalCount` still drives the "1–25 of 4,321"
   label; without it the label reads "1–25+" and the next button stays enabled
   until a page comes back empty.
-- **Load more** fires automatically as the viewport reaches the loaded rows,
-  with an inline "loading more" indicator distinct from the initial skeleton.
+- **Load more** fires automatically when the pager reaches the last loaded
+  page, showing an inline "loading more" indicator distinct from the initial
+  skeleton.
 - **Search** (500 ms debounce), **sortable header clicks**, and the **reload
   button** reset to page 1, clear stale rows, and abort in-flight requests.
   Only columns marked `sortable: true` are sortable in this mode; every other
@@ -146,12 +151,13 @@ The snapshot is:
 
 ```ts
 {
-  loading: boolean;       // full (re)load in progress
-  loadingMore: boolean;   // appending the next page
-  error: boolean;         // latest full load failed
-  hasMore: boolean;       // another page is available
+  loading: boolean;        // full (re)load in progress
+  loadingMore: boolean;    // appending the next page
+  loadMoreError: boolean;  // latest next-page (append) failed
+  error: boolean;          // latest full load failed
+  hasMore: boolean;        // another page is available
   totalCount: number | null;
-  loadedCount: number;    // rows currently loaded
+  loadedCount: number;     // rows currently loaded
 }
 ```
 

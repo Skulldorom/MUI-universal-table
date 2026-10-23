@@ -4,6 +4,7 @@ import Paper from "@mui/material/Paper";
 import useSearchableRows from "./hooks/useSearchableRows";
 import useSelectableRows from "./hooks/useSelectableRows";
 import useFetchRowsState from "./hooks/useFetchRowsState";
+import { getInitialPageSize } from "./utils/tableUtils";
 import TableSelectionBanner from "./components/TableSelectionBanner";
 import TableTitle from "./components/TableTitle";
 import TableToolbarContent from "./components/TableToolbarContent";
@@ -32,8 +33,23 @@ export default function UniversalTable({
   loadMoreSignal,
 }) {
   const debounceRef = React.useRef(null);
+  // Assigned after `useSelectableRows` so an external filters/reset change can
+  // drop selection without the fetch hook depending on the selection hook.
+  const clearSelectionRef = React.useRef(() => {});
 
   const fetchMode = typeof fetchRows === "function";
+
+  // Cancel any pending search debounce so a queued reset can't fire after
+  // (and supersede) a sort/reload/external reset performed in the meantime.
+  const cancelPendingSearch = React.useCallback(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
+
+  const handleExternalReset = React.useCallback(() => {
+    cancelPendingSearch();
+    clearSelectionRef.current();
+  }, [cancelPendingSearch]);
 
   const head = headers || [];
   const { rows: searchableRows, searchTerm, setSearchTerm } = useSearchableRows(
@@ -52,6 +68,8 @@ export default function UniversalTable({
     searchTerm,
     column: orderBy,
     direction: order,
+    onExternalReset: handleExternalReset,
+    initialPageSize: getInitialPageSize(pageSizeOptions),
   });
 
   const rows = fetchMode ? fetchState.rows : searchableRows;
@@ -62,6 +80,10 @@ export default function UniversalTable({
       selectRows,
       selectID,
     });
+
+  React.useEffect(() => {
+    clearSelectionRef.current = clearSelection;
+  }, [clearSelection]);
 
   const handleSearchChange = React.useCallback(
     (value) => {
@@ -110,6 +132,7 @@ export default function UniversalTable({
     () => ({
       loading: fetchState.loading,
       loadingMore: fetchState.loadingMore,
+      loadMoreError: fetchState.loadMoreError,
       error: fetchState.error,
       hasMore: fetchState.hasMore,
       totalCount: fetchState.totalCount,
@@ -118,6 +141,7 @@ export default function UniversalTable({
     [
       fetchState.loading,
       fetchState.loadingMore,
+      fetchState.loadMoreError,
       fetchState.error,
       fetchState.hasMore,
       fetchState.totalCount,
@@ -148,13 +172,6 @@ export default function UniversalTable({
     loadMoreSignalRef.current = loadMoreSignal;
     loadMore();
   }, [fetchMode, loadMoreSignal, loadMore]);
-
-  // Cancel any pending search debounce so a queued reset can't fire after
-  // (and supersede) a sort/reload performed in the meantime.
-  const cancelPendingSearch = React.useCallback(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = null;
-  }, []);
 
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {
@@ -203,7 +220,9 @@ export default function UniversalTable({
                 ? handleReload
                 : undefined
             }
-            reloadBtnLoading={reloadBtnLoading}
+            reloadBtnLoading={
+              reloadBtnLoading || (fetchMode && fetchState.loading)
+            }
             searchTerm={searchTerm}
             onSearchChange={handleSearch}
             name={name}
@@ -241,6 +260,7 @@ export default function UniversalTable({
                   error: fetchState.error,
                   onLoadMore: fetchState.loadMore,
                   onRetry: fetchState.resetQuery,
+                  onPageSizeChange: fetchState.changePageSize,
                 }
               : undefined
           }
@@ -293,7 +313,7 @@ UniversalTable.propTypes = {
   reset: PropTypes.any,
   /**
    * `fetchRows` mode only. Called with the fetch state snapshot whenever it
-   * changes: `{ loading, loadingMore, error, hasMore, totalCount, loadedCount }`.
+   * changes: `{ loading, loadingMore, loadMoreError, error, hasMore, totalCount, loadedCount }`.
    * Use it to drive parent-level UI (spinners, banners, counters).
    */
   onStateChange: PropTypes.func,
