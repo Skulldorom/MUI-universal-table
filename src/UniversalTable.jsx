@@ -1,9 +1,10 @@
 import React from "react";
 import PropTypes from "prop-types";
 import Paper from "@mui/material/Paper";
-import LazyLoadingIndicator from "./components/LazyLoadingIndicator";
 import useSearchableRows from "./hooks/useSearchableRows";
 import useSelectableRows from "./hooks/useSelectableRows";
+import useFetchRowsState from "./hooks/useFetchRowsState";
+import { getInitialPageSize } from "./utils/tableUtils";
 import TableSelectionBanner from "./components/TableSelectionBanner";
 import TableTitle from "./components/TableTitle";
 import TableToolbarContent from "./components/TableToolbarContent";
@@ -13,10 +14,7 @@ export default function UniversalTable({
   loading,
   setLoading,
   onReload,
-  lazyloading = false,
-  currentPage,
-  totalPages,
-  data,
+  data = [],
   headers,
   name,
   reloadBtnLoading,
@@ -28,27 +26,64 @@ export default function UniversalTable({
   onSelection,
   pageSizeOptions,
   persistSearch,
-  asyncPages,
+  fetchRows,
+  filters,
+  reset,
+  onStateChange,
+  loadMoreSignal,
 }) {
   const debounceRef = React.useRef(null);
-  const hasLoadedInitialAsyncPageRef = React.useRef(false);
+  // Assigned after `useSelectableRows` so an external filters/reset change can
+  // drop selection without the fetch hook depending on the selection hook.
+  const clearSelectionRef = React.useRef(() => {});
 
-  const async = typeof asyncPages === "number" && asyncPages > 0;
+  const fetchMode = typeof fetchRows === "function";
+
+  // Cancel any pending search debounce so a queued reset can't fire after
+  // (and supersede) a sort/reload/external reset performed in the meantime.
+  const cancelPendingSearch = React.useCallback(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
+
+  const handleExternalReset = React.useCallback(() => {
+    cancelPendingSearch();
+    clearSelectionRef.current();
+  }, [cancelPendingSearch]);
 
   const head = headers || [];
-  const { rows, searchTerm, setSearchTerm } = useSearchableRows(
+  const { rows: searchableRows, searchTerm, setSearchTerm } = useSearchableRows(
     data,
     head,
-    async,
+    fetchMode,
   );
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("");
+
+  const fetchState = useFetchRowsState({
+    enabled: fetchMode,
+    fetchRows,
+    filters,
+    resetSignal: reset,
+    searchTerm,
+    column: orderBy,
+    direction: order,
+    onExternalReset: handleExternalReset,
+    initialPageSize: getInitialPageSize(pageSizeOptions),
+  });
+
+  const rows = fetchMode ? fetchState.rows : searchableRows;
+  const { resetQuery, loadMore } = fetchState;
   const { selected, clearSelection, handleSelectAllClick, handleClick } =
     useSelectableRows({
       rows,
       selectRows,
       selectID,
     });
+
+  React.useEffect(() => {
+    clearSelectionRef.current = clearSelection;
+  }, [clearSelection]);
 
   const handleSearchChange = React.useCallback(
     (value) => {
@@ -74,17 +109,13 @@ export default function UniversalTable({
   );
 
   const handleSearch = (searchValue) => {
-    if (async) {
+    if (fetchMode) {
+      clearSelection();
       setSearchTerm(searchValue);
       clearTimeout(debounceRef.current);
 
       debounceRef.current = setTimeout(() => {
-        setLoading({
-          searchTerm: searchValue,
-          direction: order,
-          column: orderBy,
-          pages: asyncPages,
-        });
+        fetchState.resetQuery({ searchTerm: searchValue });
       }, 500);
     } else {
       handleSearchChange(searchValue);
@@ -95,41 +126,80 @@ export default function UniversalTable({
     return () => clearTimeout(debounceRef.current);
   }, []);
 
+  // Stable snapshot of the internal fetch state, published to consumers via
+  // `onStateChange`.
+  const fetchSnapshot = React.useMemo(
+    () => ({
+      loading: fetchState.loading,
+      loadingMore: fetchState.loadingMore,
+      loadMoreError: fetchState.loadMoreError,
+      error: fetchState.error,
+      hasMore: fetchState.hasMore,
+      totalCount: fetchState.totalCount,
+      loadedCount: fetchState.rows.length,
+    }),
+    [
+      fetchState.loading,
+      fetchState.loadingMore,
+      fetchState.loadMoreError,
+      fetchState.error,
+      fetchState.hasMore,
+      fetchState.totalCount,
+      fetchState.rows.length,
+    ],
+  );
+
+  // Observe: notify the consumer whenever the fetch state actually changes.
+  // Seeded with the initial snapshot so the mount render doesn't emit a
+  // spurious pre-fetch "idle" state.
+  const emittedStateRef = React.useRef(fetchSnapshot);
   React.useEffect(() => {
-    if (!async || hasLoadedInitialAsyncPageRef.current) {
+    if (!fetchMode || emittedStateRef.current === fetchSnapshot) {
       return;
     }
+    emittedStateRef.current = fetchSnapshot;
+    onStateChange?.(fetchSnapshot);
+  }, [fetchMode, fetchSnapshot, onStateChange]);
 
-    hasLoadedInitialAsyncPageRef.current = true;
-    setLoading({
-      searchTerm,
-      direction: order,
-      column: orderBy,
-      pages: asyncPages,
-    });
-  }, [async, asyncPages, order, orderBy, searchTerm, setLoading]);
+  // Command: bump `loadMoreSignal` (e.g. a counter) to append the next page.
+  // Declarative equivalent of an imperative `loadMore()`; reload is already
+  // covered by the `reset` prop.
+  const loadMoreSignalRef = React.useRef(loadMoreSignal);
+  React.useEffect(() => {
+    if (!fetchMode || Object.is(loadMoreSignalRef.current, loadMoreSignal)) {
+      return;
+    }
+    loadMoreSignalRef.current = loadMoreSignal;
+    loadMore();
+  }, [fetchMode, loadMoreSignal, loadMore]);
 
   const handleReload = React.useCallback(() => {
     if (typeof onReload === "function") {
       onReload();
       return;
     }
-    if (typeof setLoading === "function") {
-      setLoading(
-        async
-          ? { searchTerm, direction: order, column: orderBy, pages: asyncPages }
-          : true,
-      );
+    if (fetchMode) {
+      cancelPendingSearch();
+      resetQuery();
+      return;
     }
-  }, [async, onReload, setLoading, searchTerm, order, orderBy, asyncPages]);
+    if (typeof setLoading === "function") {
+      setLoading(true);
+    }
+  }, [fetchMode, resetQuery, onReload, setLoading, cancelPendingSearch]);
+
+  // Server-sort bridge: useEnhancedTableState calls its `apiCall` with a
+  // payload object; in fetch mode only the column/direction matter.
+  const handleFetchSort = React.useCallback(
+    ({ column, direction }) => {
+      cancelPendingSearch();
+      resetQuery({ column, direction });
+    },
+    [resetQuery, cancelPendingSearch],
+  );
 
   return (
     <>
-      <LazyLoadingIndicator
-        show={lazyloading}
-        currentPage={currentPage}
-        totalPages={totalPages}
-      />
       <Paper
         sx={{
           ...(subTable && { boxShadow: "none" }),
@@ -144,11 +214,15 @@ export default function UniversalTable({
         {!subTable && (
           <TableToolbarContent
             onReload={
-              typeof onReload === "function" || typeof setLoading === "function"
+              typeof onReload === "function" ||
+              typeof setLoading === "function" ||
+              fetchMode
                 ? handleReload
                 : undefined
             }
-            reloadBtnLoading={reloadBtnLoading}
+            reloadBtnLoading={
+              reloadBtnLoading || (fetchMode && fetchState.loading)
+            }
             searchTerm={searchTerm}
             onSearchChange={handleSearch}
             name={name}
@@ -158,11 +232,11 @@ export default function UniversalTable({
         <EnhancedTable
           headers={head}
           rows={rows}
-          resetFlag={searchTerm}
+          resetFlag={fetchMode ? fetchState.queryVersion : searchTerm}
           searchTerm={searchTerm}
           subTable={subTable}
           hideBadge={hideBadge}
-          loading={loading}
+          loading={fetchMode ? fetchState.loading : loading}
           selectRows={selectRows}
           handleSelectAllClick={handleSelectAllClick}
           handleClick={handleClick}
@@ -170,13 +244,26 @@ export default function UniversalTable({
           selectID={selectID}
           pageSizeOptions={pageSizeOptions}
           name={name}
-          setLoading={setLoading}
+          setLoading={fetchMode ? handleFetchSort : setLoading}
           order={order}
           orderBy={orderBy}
           setOrder={setOrder}
           setOrderBy={setOrderBy}
-          asyncPages={asyncPages}
-          async={async}
+          async={fetchMode}
+          fetchState={
+            fetchMode
+              ? {
+                  totalCount: fetchState.totalCount,
+                  hasMore: fetchState.hasMore,
+                  loadingMore: fetchState.loadingMore,
+                  loadMoreError: fetchState.loadMoreError,
+                  error: fetchState.error,
+                  onLoadMore: fetchState.loadMore,
+                  onRetry: fetchState.resetQuery,
+                  onPageSizeChange: fetchState.changePageSize,
+                }
+              : undefined
+          }
         />
       </Paper>
     </>
@@ -188,10 +275,8 @@ UniversalTable.propTypes = {
   setLoading: PropTypes.func,
   /** Preferred callback — fires when the user clicks reload. */
   onReload: PropTypes.func,
-  lazyloading: PropTypes.bool,
-  currentPage: PropTypes.number,
-  totalPages: PropTypes.number,
-  data: PropTypes.array.isRequired,
+  /** Required in sync mode; unused (and optional) in `fetchRows` mode. */
+  data: PropTypes.array,
   headers: PropTypes.array.isRequired,
   name: PropTypes.string,
   reloadBtnLoading: PropTypes.bool,
@@ -205,5 +290,37 @@ UniversalTable.propTypes = {
   pageSizeOptions: PropTypes.arrayOf(PropTypes.number),
   /** Persist search term to sessionStorage (requires name prop). Default: false */
   persistSearch: PropTypes.bool,
-  asyncPages: PropTypes.number,
+  /**
+   * Server-side pagination data source. When provided, the table owns the
+   * rows state and calls this function whenever it needs a page:
+   * `(filters, signal) => Promise<{ rows: array, totalCount?: number }>`
+   * where `filters` is the `filters` prop merged with the table's current
+   * `page`, `searchTerm`, `column` and `direction`.
+   * `totalCount` should be returned on page 1 (drives the footer and
+   * end-of-data detection); later pages may omit it.
+   */
+  fetchRows: PropTypes.func,
+  /**
+   * Plain, JSON-serializable filter object. Merged with the table's
+   * pagination/search/sort state and passed through to `fetchRows`. Compared
+   * by value — changing it resets to page 1.
+   */
+  filters: PropTypes.object,
+  /**
+   * Opaque reset signal — bump it (e.g. a counter) after external mutations
+   * to make the table discard loaded rows and refetch from page 1.
+   */
+  reset: PropTypes.any,
+  /**
+   * `fetchRows` mode only. Called with the fetch state snapshot whenever it
+   * changes: `{ loading, loadingMore, loadMoreError, error, hasMore, totalCount, loadedCount }`.
+   * Use it to drive parent-level UI (spinners, banners, counters).
+   */
+  onStateChange: PropTypes.func,
+  /**
+   * `fetchRows` mode only. Bump this value (e.g. an incrementing counter) to
+   * append the next server page — the declarative equivalent of a manual
+   * "Load more". Reload is covered by the `reset` prop.
+   */
+  loadMoreSignal: PropTypes.any,
 };
