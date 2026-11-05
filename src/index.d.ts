@@ -5,11 +5,47 @@ export interface TableRowData {
   [key: string]: unknown;
 }
 
-export interface AsyncLoadingPayload {
+/**
+ * First argument passed to `fetchRows`: the `filters` prop merged with the
+ * table's current query state. Must be JSON-serializable.
+ */
+export interface FetchRowsQuery {
+  /** Server page being requested (1-based). */
+  page: number;
+  /** Rows requested for this page (the table's current rows-per-page). */
+  pageSize: number;
   searchTerm: string;
-  direction: "asc" | "desc";
   column: string;
-  pages: number;
+  direction: "asc" | "desc";
+  /** Pass-through of the `filters` prop (JSON-serializable values). */
+  [key: string]: unknown;
+}
+
+export interface FetchRowsResult {
+  rows: TableRowData[];
+  /**
+   * Server-side total row count. Should be provided on page 1 (drives the
+   * pagination footer and end-of-data detection); later pages may omit it.
+   */
+  totalCount?: number;
+}
+
+/** Snapshot of the table-owned fetch state, published via `onStateChange`. */
+export interface FetchRowsState {
+  /** A full (re)load is in progress: initial load, search, sort, filters, reset or reload. */
+  loading: boolean;
+  /** The next server page is being appended in the background. */
+  loadingMore: boolean;
+  /** The latest next-page (append) request failed. */
+  loadMoreError: boolean;
+  /** The latest full (re)load failed. */
+  error: boolean;
+  /** Whether another server page is available. */
+  hasMore: boolean;
+  /** Server total row count, or `null` until the first page resolves with one. */
+  totalCount: number | null;
+  /** Number of rows currently loaded into the table. */
+  loadedCount: number;
 }
 
 export interface TableHeader {
@@ -34,22 +70,12 @@ export interface TableHeader {
 }
 
 interface UniversalTableCommonProps {
-  /** Array of data objects to display */
-  data: TableRowData[];
   /** Array of header configuration objects */
   headers: TableHeader[];
   /** Table title */
   name?: string;
-  /** Shows loading state */
-  loading?: boolean;
   /** Fires when the user clicks the reload button */
   onReload?: () => void;
-  /** Enable lazy loading indicator */
-  lazyloading?: boolean;
-  /** Current page for lazy loading */
-  currentPage?: number;
-  /** Total pages for lazy loading */
-  totalPages?: number;
   /** Loading state for reload button */
   reloadBtnLoading?: boolean;
   /** Whether this is a nested sub-table */
@@ -71,19 +97,54 @@ interface UniversalTableCommonProps {
 }
 
 export interface UniversalTableSyncProps extends UniversalTableCommonProps {
-  /** Function to control loading state in synchronous mode (legacy — prefer onReload) */
+  /** Array of data objects to display */
+  data: TableRowData[];
+  /** Shows loading state */
+  loading?: boolean;
+  /** Function notified when a reload is requested (legacy — prefer onReload) */
   setLoading?: (loading: boolean) => void;
-  asyncPages?: undefined;
+  fetchRows?: undefined;
 }
 
-export interface UniversalTableAsyncProps extends UniversalTableCommonProps {
-  /** Function to request async search/sort/reload data */
-  setLoading: (loading: AsyncLoadingPayload) => void;
-  /** Enables async search/sort payload mode and supplies total async pages */
-  asyncPages: number;
+export interface UniversalTableFetchProps extends UniversalTableCommonProps {
+  /**
+   * Server-side pagination data source. The table calls this whenever it
+   * needs a page: page 1 on mount / search / sort / reload / filters or
+   * reset changes, and the next page as the user reaches the end of the
+   * rows loaded so far.
+   */
+  fetchRows: (
+    filters: FetchRowsQuery,
+    signal: AbortSignal,
+  ) => Promise<FetchRowsResult>;
+  /**
+   * Plain object of filter values merged into the `filters` query sent to
+   * `fetchRows`. Compared by value, so it must be JSON-serializable; a change
+   * resets the table to page 1.
+   */
+  filters?: Record<string, unknown>;
+  /**
+   * Opaque reset signal — change it (e.g. an incrementing counter) after
+   * external mutations to make the table discard loaded rows and refetch
+   * from page 1.
+   */
+  reset?: unknown;
+  /**
+   * Called with the fetch state snapshot whenever it changes, so parent UI can
+   * react to the table-owned loading/error/pagination state.
+   */
+  onStateChange?: (state: FetchRowsState) => void;
+  /**
+   * Bump this value (e.g. an incrementing counter) to append the next server
+   * page — the declarative equivalent of a manual "Load more".
+   */
+  loadMoreSignal?: unknown;
+  data?: undefined;
+  loading?: undefined;
+  setLoading?: undefined;
 }
 
-export type UniversalTableProps = UniversalTableSyncProps | UniversalTableAsyncProps;
+export type UniversalTableProps = UniversalTableSyncProps | UniversalTableFetchProps;
 
 declare const UniversalTable: FC<UniversalTableProps>;
 

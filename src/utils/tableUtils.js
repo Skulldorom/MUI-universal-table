@@ -47,6 +47,14 @@ export function getPageOptions(rowCount) {
   return [5, 10, 25, 50, 100, rowCount];
 }
 
+/** Initial page size shared by the sync pager and server-side `fetchRows`. */
+export function getInitialPageSize(pageSizeOptions) {
+  if (Array.isArray(pageSizeOptions) && pageSizeOptions.length > 0) {
+    return pageSizeOptions[0];
+  }
+  return 5;
+}
+
 export function splitHeaders(headers) {
   return headers.reduce(
     (groups, header) => {

@@ -17,14 +17,19 @@ function ReloadBtn({ loading, onReload }) {
 
   return (
     <Tooltip title="Reload">
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleClick}
-        disabled={loading}
-      >
-        <RefreshIcon />
-      </Button>
+      {/* MUI requires a non-disabled wrapper so the tooltip can receive
+          pointer/focus events while the button is loading. */}
+      <span>
+        <Button
+          variant="contained"
+          color="primary"
+          aria-label="Reload"
+          onClick={handleClick}
+          disabled={loading}
+        >
+          <RefreshIcon />
+        </Button>
+      </span>
     </Tooltip>
   );
 }

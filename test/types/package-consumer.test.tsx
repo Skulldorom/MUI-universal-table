@@ -1,7 +1,9 @@
 import React from "react";
 import UniversalTable, { UniversalTable as NamedUniversalTable } from "../../src/index.js";
 import type {
-  AsyncLoadingPayload,
+  FetchRowsQuery,
+  FetchRowsResult,
+  FetchRowsState,
   TableHeader,
   UniversalTableProps,
 } from "../../src/index.d.ts";
@@ -24,32 +26,6 @@ const nestedHeaders: TableHeader[] = [
   },
 ];
 
-const asyncPayload: AsyncLoadingPayload = {
-  searchTerm: "Ada",
-  direction: "asc",
-  column: "name",
-  pages: 2,
-};
-
-asyncPayload.pages.toFixed();
-
-const asyncProps: UniversalTableProps = {
-  data: rows,
-  headers,
-  name: "Async users",
-  loading: false,
-  asyncPages: 2,
-  setLoading: (payload) => {
-    if (typeof payload !== "boolean") {
-      payload.pages.toFixed();
-      payload.searchTerm.toUpperCase();
-    }
-  },
-  onReload: () => {},
-  pageSizeOptions: [10, 25],
-  persistSearch: true,
-};
-
 const syncProps: UniversalTableProps = {
   data: rows,
   headers,
@@ -60,11 +36,54 @@ const syncProps: UniversalTableProps = {
   },
 };
 
+const fetchRows = async (
+  filters: FetchRowsQuery,
+  signal: AbortSignal,
+): Promise<FetchRowsResult> => {
+  filters.page.toFixed();
+  filters.pageSize.toFixed();
+  filters.searchTerm.toUpperCase();
+  filters.column.toUpperCase();
+  filters.direction.toUpperCase();
+  String(filters.status);
+  signal.aborted.valueOf();
+  return { rows, totalCount: rows.length };
+};
+
+const handleStateChange = (state: FetchRowsState) => {
+  state.loading.valueOf();
+  state.loadingMore.valueOf();
+  state.loadMoreError.valueOf();
+  state.error.valueOf();
+  state.hasMore.valueOf();
+  state.loadedCount.toFixed();
+  if (state.totalCount !== null) state.totalCount.toFixed();
+};
+
+const fetchProps: UniversalTableProps = {
+  headers,
+  name: "Server-paginated users",
+  fetchRows,
+  filters: { status: "open" },
+  reset: 0,
+  onStateChange: handleStateChange,
+  loadMoreSignal: 0,
+  pageSizeOptions: [10, 25],
+  persistSearch: true,
+};
+
+// @ts-expect-error — fetchRows mode does not accept `data`
+const invalidFetchProps: UniversalTableProps = {
+  headers,
+  fetchRows,
+  data: rows,
+};
+
 export function ConsumerExamples() {
   return (
     <>
-      <UniversalTable {...asyncProps} />
       <UniversalTable {...syncProps} />
+      <UniversalTable {...fetchProps} />
       <NamedUniversalTable
         data={[{ id: 1, children: rows }]}
         headers={nestedHeaders}
