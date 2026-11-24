@@ -3,9 +3,36 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
+// Resolve npm's JS entrypoint and run it with the current Node binary. This
+// avoids spawning npm.cmd/npx.cmd through a shell on Windows (which triggers
+// Node's DEP0190 warning and shell-quoting hazards).
+const npmCliPath =
+  process.env.npm_execpath ||
+  [
+    join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+    join(
+      dirname(process.execPath),
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+  ].find((candidate) => existsSync(candidate));
+
+if (!npmCliPath) {
+  throw new Error("Could not locate npm-cli.js; run this test via an npm script.");
+}
+
+function runNpm(args, options) {
+  return execFileSync(process.execPath, [npmCliPath, ...args], options);
+}
+
 const requiredFiles = [
   "dist/index.cjs",
   "dist/index.cjs.map",
@@ -40,7 +67,7 @@ for (const file of distributableJavaScript) {
   }
 }
 
-const esmEntry = await import(join(root, "dist/index.esm.js"));
+const esmEntry = await import(pathToFileURL(join(root, "dist/index.esm.js")).href);
 if (typeof esmEntry.default !== "function") {
   throw new Error("ESM default export is not a component function");
 }
@@ -58,8 +85,7 @@ if (typeof cjsEntry.UniversalTable !== "function") {
 }
 
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-const packOutput = execFileSync(
-  "npm",
+const packOutput = runNpm(
   ["pack", "--dry-run", "--json", "--ignore-scripts"],
   { encoding: "utf8" },
 );
@@ -91,9 +117,14 @@ const packageExtractDirectory = await mkdtemp(
   join(tmpdir(), "mui-universal-table-extract-"),
 );
 try {
-  const packageOutput = execFileSync(
-    "npm",
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", packageTempDirectory],
+  const packageOutput = runNpm(
+    [
+      "pack",
+      "--json",
+      "--ignore-scripts",
+      "--pack-destination",
+      packageTempDirectory,
+    ],
     { cwd: root, encoding: "utf8" },
   );
   const packageResult = JSON.parse(packageOutput);

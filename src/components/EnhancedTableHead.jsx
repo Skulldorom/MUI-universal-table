@@ -48,7 +48,7 @@ function EnhancedTableHead(props) {
               onClick={() =>
                 onRequestSort(headCell.id, headCell.sortable && async)
               }
-              disabled={headCell.subRow}
+              disabled={headCell.subRow || (async && !headCell.sortable)}
             >
               {headCell.label}
               {orderBy === headCell.id ? (

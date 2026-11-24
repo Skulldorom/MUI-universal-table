@@ -1,7 +1,7 @@
 import React from "react";
 import { getSearchableColumnIds, filterRows } from "../utils/tableUtils";
 
-export default function useSearchableRows(data, headers, async) {
+export default function useSearchableRows(data, headers, serverSide) {
   const [searchTerm, setSearchTerm] = React.useState("");
 
   const filterOptions = React.useMemo(
@@ -10,8 +10,8 @@ export default function useSearchableRows(data, headers, async) {
   );
 
   const rows = React.useMemo(
-    () => (async ? data : filterRows(data, searchTerm, filterOptions)),
-    [async, data, filterOptions, searchTerm],
+    () => (serverSide ? data : filterRows(data, searchTerm, filterOptions)),
+    [serverSide, data, filterOptions, searchTerm],
   );
 
   return {
